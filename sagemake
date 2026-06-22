@@ -1,0 +1,192 @@
+#!/usr/bin/env python3
+"""
+sagemake — SageMake Interactive Template Generator
+
+Guides the user through creating a custom sagemake for their own
+Sage-based project using sagemake-template as the starting point.
+"""
+
+import os
+import shutil
+import subprocess
+import sys
+from pathlib import Path
+
+# ── ANSI helpers ──────────────────────────────────────────────────────────────
+
+RESET = "\033[0m"
+BOLD = "\033[1m"
+DIM = "\033[2m"
+RED = "\033[31m"
+GREEN = "\033[32m"
+YELLOW = "\033[33m"
+CYAN = "\033[36m"
+
+# Try to use rich if available for a nicer experience
+try:
+    from rich.console import Console
+    from rich.prompt import Prompt, Confirm
+    from rich.panel import Panel
+    from rich.syntax import Syntax
+    from rich.table import Table
+    RICH = True
+    console = Console()
+    _banner = lambda t: console.print(Panel(f"[bold cyan]{t}[/]", border_style="cyan"))
+    _section = lambda t: console.print(f"  [cyan]→[/] {t}")
+    _step = lambda t: console.print(f"    {t} ... ", end="")
+    _ok = lambda: console.print("[green]✓ done[/]")
+    _fail = lambda: console.print("[red]✗ failed[/]")
+    _step_ok = lambda d: console.print(f"[green]✓ {d}[/]")
+    _step_fail = lambda d: console.print(f"[red]✗ {d}[/]") or sys.exit(1)
+    _input = lambda p, d="": Prompt.ask(p, default=d) if d else Prompt.ask(p)
+    _confirm = lambda p, d=True: Confirm.ask(p, default=d)
+except ImportError:
+    RICH = False
+    _banner = lambda t: print(f"\n{CYAN}{'═' * 60}{RESET}\n{CYAN}{BOLD}  {t}{RESET}\n{CYAN}{'═' * 60}{RESET}\n")
+    _section = lambda t: print(f"  {CYAN}→{RESET} {t}")
+    _step = lambda t: print(f"    {t} ... ", end="", flush=True)
+    _ok = lambda: print(f"{GREEN}✓ done{RESET}")
+    _fail = lambda: print(f"{RED}✗ failed{RESET}") or sys.exit(1)
+    _step_ok = lambda d: print(f"{GREEN}✓ {d}{RESET}")
+    _step_fail = lambda d: print(f"{RED}✗ {d}{RESET}") or sys.exit(1)
+    _input = lambda p, d="": input(f"  {p} [{d}]: ").strip() or d if d else input(f"  {p}: ").strip()
+    _confirm = lambda p, d=True: input(f"  {p} [{'Y' if d else 'y'}/{'n' if d else 'N'}]: ").strip().lower() in ("y", "yes") if d else input(f"  {p} [y/N]: ").strip().lower() in ("y", "yes")
+
+
+# ── Paths ─────────────────────────────────────────────────────────────────────
+
+ROOT = Path(__file__).resolve().parent
+TEMPLATE = ROOT / "sagemake-template"
+OUTPUT_DIR = ROOT / "output"
+
+
+def print_logo() -> None:
+    logo = f"""{CYAN}{BOLD}
+   ╔═══════════════════════════════════════════╗
+   ║        SageMake  —  Template Generator    ║
+   ╚═══════════════════════════════════════════╝{RESET}"""
+    print(logo)
+
+
+def collect_project_info() -> dict:
+    """Interactively gather project information from the user."""
+    info = {}
+
+    _banner("Project Information")
+
+    info["project_name"] = _input("Project name", "my-sage-project")
+    info["project_description"] = _input(
+        "Short description",
+        "A Sage-based project",
+    )
+    info["binary_name"] = _input(
+        "Binary / output name",
+        info["project_name"].replace("-", "_"),
+    )
+    info["dependencies"] = _input(
+        "Required dependencies (comma-separated)",
+        "gcc, make",
+    )
+
+    # Confirm
+    _banner("Summary")
+
+    deps_list = [d.strip() for d in info["dependencies"].split(",") if d.strip()]
+
+    if RICH:
+        table = Table(show_header=False, border_style="cyan")
+        table.add_column("Key", style="bold")
+        table.add_column("Value")
+        table.add_row("Project name", info["project_name"])
+        table.add_row("Description", info["project_description"])
+        table.add_row("Binary name", info["binary_name"])
+        table.add_row("Dependencies", ", ".join(deps_list))
+        console.print(table)
+    else:
+        print(f"  {BOLD}Project name:{RESET}    {info['project_name']}")
+        print(f"  {BOLD}Description:{RESET}     {info['project_description']}")
+        print(f"  {BOLD}Binary name:{RESET}     {info['binary_name']}")
+        print(f"  {BOLD}Dependencies:{RESET}    {', '.join(deps_list)}")
+
+    if not _confirm("Generate sagemake", True):
+        _step_fail("cancelled by user")
+
+    info["dependencies_list"] = deps_list
+    return info
+
+
+def generate_sagemake(info: dict) -> Path:
+    """Read the template, replace placeholders, and write the output."""
+    _banner("Generating sagemake")
+
+    # Read template
+    _step("reading template")
+    if not TEMPLATE.exists():
+        _step_fail(f"template not found at {TEMPLATE}")
+    content = TEMPLATE.read_text()
+    _ok()
+
+    # Replace placeholders
+    _step("substituting variables")
+    replacements = {
+        "{{ PROJECT_NAME }}": info["project_name"],
+        "{{ PROJECT_DESCRIPTION }}": info["project_description"],
+        "{{ BINARY_NAME }}": info["binary_name"],
+        "{{ DEPENDENCIES }}": str(info["dependencies_list"]),
+    }
+    for placeholder, value in replacements.items():
+        content = content.replace(placeholder, value)
+    _ok()
+
+    # Create project directory in output/
+    project_dir = OUTPUT_DIR / info["project_name"]
+    project_dir.mkdir(parents=True, exist_ok=True)
+
+    # Write output file
+    output_file = project_dir / "sagemake"
+    _step(f"writing {output_file}")
+    output_file.write_text(content)
+    output_file.chmod(0o755)
+    _ok()
+
+    return output_file
+
+
+def show_next_steps(output_file: Path) -> None:
+    """Display completion message and next steps."""
+    _banner("Done")
+
+    if RICH:
+        console.print(
+            Panel(
+                f"[green]✓[/] sagemake generated at:\n"
+                f"  [bold]{output_file}[/]\n\n"
+                f"Next steps:\n"
+                f"  1. [bold]cd {output_file.parent}[/]\n"
+                f"  2. [bold]./sagemake build[/] — try the build pipeline\n"
+                f"  3. Edit the file to add your real build logic\n"
+                f"  4. Move [bold]sagemake[/] to your project root",
+                border_style="green",
+            )
+        )
+    else:
+        print(f"\n  {GREEN}✓{RESET} sagemake generated at {BOLD}{output_file}{RESET}")
+        print(f"\n  {BOLD}Next steps:{RESET}")
+        print(f"    1. cd {output_file.parent}")
+        print(f"    2. ./sagemake build  — try the build pipeline")
+        print(f"    3. Edit the file to add your real build logic")
+        print(f"    4. Move sagemake to your project root")
+
+
+def main() -> None:
+    print_logo()
+    print(f"  {DIM}This tool turns sagemake-template into a ready-to-use{RESET}")
+    print(f"  {DIM}sagemake for your own Sage-based project.{RESET}\n")
+
+    info = collect_project_info()
+    output_file = generate_sagemake(info)
+    show_next_steps(output_file)
+
+
+if __name__ == "__main__":
+    main()

@@ -29,3 +29,18 @@ Each project ships a `sagemake` script supporting a common set of commands:
 ```
 
 See [SPEC.md](SPEC.md) for the complete specification.
+
+## Making Your Own sagemake
+
+This repo also ships an interactive tool for generating your own `sagemake` for
+any Sage-based project. Run it with:
+
+```sh
+./sagemake
+```
+
+It will prompt you for your project name, description, binary name, and
+dependencies, then produce a ready-to-use `sagemake` in `output/<name>/`.
+
+You can also copy `sagemake-template` and edit the `{{ PLACEHOLDERS }}` by hand.
+See [SPEC.md](SPEC.md#making-your-own-sagemake) for the full guide.

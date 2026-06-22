@@ -1,0 +1,172 @@
+#!/usr/bin/env python3
+"""
+sagemake — Build system for {{ PROJECT_NAME }}
+
+{{ PROJECT_DESCRIPTION }}
+
+Usage:
+    ./sagemake [command] [flags]
+
+Commands:
+    build      Run the full build pipeline
+    test       Run the test suite
+    install    Install built artifacts
+    clean      Remove build artifacts
+    all        Run build then test
+"""
+
+import os
+import subprocess
+import sys
+from pathlib import Path
+
+# ── ANSI helpers ──────────────────────────────────────────────────────────────
+
+RESET = "\033[0m"
+BOLD = "\033[1m"
+RED = "\033[31m"
+GREEN = "\033[32m"
+YELLOW = "\033[33m"
+CYAN = "\033[36m"
+
+
+def banner(title: str) -> None:
+    width = 60
+    line = f"{CYAN}{'═' * width}{RESET}"
+    print(f"\n{line}")
+    print(f"{CYAN}  {BOLD}{title}{RESET}")
+    print(f"{line}\n")
+
+
+def section(title: str) -> None:
+    print(f"  {CYAN}→{RESET} {title}")
+
+
+def step(msg: str) -> None:
+    print(f"    {msg} ... ", end="", flush=True)
+
+
+def ok() -> None:
+    print(f"{GREEN}✓ done{RESET}")
+
+
+def fail() -> None:
+    print(f"{RED}✗ failed{RESET}")
+    sys.exit(1)
+
+
+def step_ok(detail: str) -> None:
+    print(f"{GREEN}✓ {detail}{RESET}")
+
+
+def step_fail(detail: str) -> None:
+    print(f"{RED}✗ {detail}{RESET}")
+    sys.exit(1)
+
+
+def step_warn(detail: str) -> None:
+    print(f"{YELLOW}! {detail}{RESET}")
+
+
+def run(cmd: list[str], **kwargs) -> subprocess.CompletedProcess:
+    """Run a command and return the result."""
+    try:
+        return subprocess.run(cmd, check=False, **kwargs)
+    except FileNotFoundError:
+        step_fail(f"command not found: {cmd[0]}")
+
+
+# ── Configuration ─────────────────────────────────────────────────────────────
+
+ROOT = Path(__file__).resolve().parent
+BUILD_DIR = ROOT / "build"
+SRC_DIR = ROOT / "src"
+TEST_DIR = ROOT / "tests"
+BINARY_NAME = "{{ BINARY_NAME }}"
+
+
+# ── Commands ──────────────────────────────────────────────────────────────────
+
+def cmd_build(args: list[str]) -> None:
+    banner("build — {{ PROJECT_NAME }}")
+    check_dependencies()
+    section("Compilation")
+    step("compiling source")
+    # TODO: Add your build logic here
+    # Example: run(["gcc", "-o", str(BUILD_DIR / BINARY_NAME), str(SRC_DIR / "main.c")])
+    ok()
+
+
+def cmd_test(args: list[str]) -> None:
+    banner("test — {{ PROJECT_NAME }}")
+    # TODO: Add your test logic here
+    # Example: run(["pytest", str(TEST_DIR)])
+    step_ok("all tests passed")
+
+
+def cmd_install(args: list[str]) -> None:
+    banner("install — {{ PROJECT_NAME }}")
+    target = Path("/usr/local/bin") / BINARY_NAME
+    step(f"installing to {target}")
+    if not (BUILD_DIR / BINARY_NAME).exists():
+        step_fail(f"{BINARY_NAME} not built — run build first")
+    run(["sudo", "cp", str(BUILD_DIR / BINARY_NAME), str(target)])
+    run(["sudo", "chmod", "755", str(target)])
+    step_ok(f"installed {BINARY_NAME}")
+
+
+def cmd_clean(args: list[str]) -> None:
+    banner("clean — {{ PROJECT_NAME }}")
+    section("Removing build artifacts")
+    step(f"removing {BUILD_DIR}")
+    run(["rm", "-rf", str(BUILD_DIR)])
+    ok()
+
+
+def cmd_all(args: list[str]) -> None:
+    cmd_build(args)
+    cmd_test(args)
+
+
+# ── Dependency check ──────────────────────────────────────────────────────────
+
+def check_dependencies() -> None:
+    """Verify required tools are available on PATH."""
+    section("Dependencies")
+    required = {{ DEPENDENCIES }}
+    missing = []
+    for dep in required:
+        step(f"checking {dep}")
+        if run(["which", dep], capture_output=True).returncode != 0:
+            missing.append(dep)
+            step_fail(f"{dep} not found")
+        else:
+            ok()
+    if missing:
+        step_fail(f"missing: {', '.join(missing)}")
+
+
+# ── CLI dispatch ──────────────────────────────────────────────────────────────
+
+def main() -> None:
+    commands: dict[str, callable] = {
+        "build": cmd_build,
+        "test": cmd_test,
+        "install": cmd_install,
+        "clean": cmd_clean,
+        "all": cmd_all,
+    }
+
+    if len(sys.argv) < 2 or sys.argv[1] not in commands:
+        banner("{{ PROJECT_NAME }} — sagemake")
+        print(f"  Usage:  ./sagemake {'|'.join(commands.keys())}")
+        print()
+        sys.exit(1)
+
+    cmd = sys.argv[1]
+    args = sys.argv[2:]
+    commands[cmd](args)
+
+
+if __name__ == "__main__":
+    main()

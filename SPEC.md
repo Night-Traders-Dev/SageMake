@@ -287,6 +287,69 @@ All projects follow this convention. The `step_fail()` / `fail()` helpers always
 
 ---
 
+---
+
+## Making Your Own sagemake
+
+You can create a custom `sagemake` for your own Sage-based project in two ways:
+
+### Option A — Interactive Generator (Recommended)
+
+This repository ships its own `sagemake` that acts as an interactive template generator:
+
+```sh
+git clone https://github.com/Night-Traders-Dev/SageMake.git
+cd SageMake
+./sagemake
+```
+
+You will be prompted for:
+- **Project name** — used in banners and help text
+- **Short description** — shown in the docstring and help output
+- **Binary / output name** — the artifact your build produces
+- **Required dependencies** — comma-separated list of tools checked before building
+
+The generator reads `sagemake-template`, substitutes your answers, and writes a
+ready-to-use `sagemake` into `output/<project-name>/sagemake`.
+
+```sh
+cd output/<project-name>
+./sagemake build
+```
+
+### Option B — Manual Template
+
+Copy `sagemake-template` from the SageMake repository into your project root
+and edit the `{{ PLACEHOLDERS }}`:
+
+| Placeholder | Description |
+|---|---|
+| `{{ PROJECT_NAME }}` | Display name used in banners and help |
+| `{{ PROJECT_DESCRIPTION }}` | One-line description in the docstring |
+| `{{ BINARY_NAME }}` | Name of the compiled binary / artifact |
+| `{{ DEPENDENCIES }}` | Python list of required CLI tools (e.g. `['gcc', 'make']`) |
+
+### Template Structure
+
+The template provides a complete, working sagemake skeleton with:
+
+- **ANSI output primitives** — `banner()`, `section()`, `step()`, `ok()`, `fail()`, `step_ok()`, `step_fail()`, `step_warn()`. No external dependencies required.
+- **Five stub commands** — `build`, `test`, `install`, `clean`, `all`. Each prints a banner, runs its section, and provides TODO comments where you drop in your real build logic.
+- **Dependency checking** — Iterates over your required tools and fails fast if any are missing.
+- **CLI dispatch** — A `commands` dict mapping command names to functions, with a usage banner for invalid input.
+
+### Convention Checklist
+
+When customizing your generated sagemake, follow these conventions:
+
+1. Add new commands as `cmd_<name>(args)` functions and register them in the `commands` dict.
+2. Use `banner()` at the top of every command, `section()` for each phase, and `step()`/`step_ok()`/`step_fail()` for individual operations.
+3. Fail fast with `step_fail()` on errors — never mask a failure.
+4. Keep it as a single, standalone file. No imports beyond the standard library and `rich` (optional).
+5. Name it exactly `sagemake`, make it executable (`chmod +x sagemake`), and place it in your repository root.
+
+For the full CLI specification and output primitive reference, see [SageLang / SageVM / SageLink / SageOS](#project-level-specification) above.
+
 ## Extending sagemake
 
 When adding a new command to any `sagemake`:

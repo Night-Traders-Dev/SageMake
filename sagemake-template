@@ -16,6 +16,7 @@ Commands:
 """
 
 import os
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -71,7 +72,9 @@ def step_warn(detail: str) -> None:
 def run(cmd: list[str], **kwargs) -> subprocess.CompletedProcess:
     """Run a command and return the result."""
     try:
-        return subprocess.run(cmd, check=False, **kwargs)
+        return subprocess.run(cmd, check=True, **kwargs)
+    except subprocess.CalledProcessError as e:
+        step_fail(f"command failed with exit code {e.returncode}: {' '.join(cmd)}")
     except FileNotFoundError:
         step_fail(f"command not found: {cmd[0]}")
 
@@ -119,7 +122,8 @@ def cmd_clean(args: list[str]) -> None:
     banner("clean — {{ PROJECT_NAME }}")
     section("Removing build artifacts")
     step(f"removing {BUILD_DIR}")
-    run(["rm", "-rf", str(BUILD_DIR)])
+    if BUILD_DIR.exists():
+        shutil.rmtree(BUILD_DIR)
     ok()
 
 
@@ -137,7 +141,7 @@ def check_dependencies() -> None:
     missing = []
     for dep in required:
         step(f"checking {dep}")
-        if run(["which", dep], capture_output=True).returncode != 0:
+        if shutil.which(dep) is None:
             missing.append(dep)
             step_fail(f"{dep} not found")
         else:

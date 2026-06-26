@@ -15,6 +15,7 @@ Commands:
     all        Run build then test
 """
 
+import hashlib
 import os
 import shutil
 import subprocess
@@ -88,16 +89,45 @@ TEST_DIR = ROOT / "tests"
 BINARY_NAME = "{{ BINARY_NAME }}"
 
 
+# ── Helpers ───────────────────────────────────────────────────────────────────
+
+def get_source_hash(directory: Path) -> str:
+    """Calculate a single SHA-256 hash for all files in a directory recursively."""
+    if not directory.exists():
+        return ""
+    hasher = hashlib.sha256()
+    for filepath in sorted(directory.rglob("*")):
+        if filepath.is_file():
+            hasher.update(filepath.relative_to(directory).as_posix().encode("utf-8"))
+            try:
+                hasher.update(filepath.read_bytes())
+            except Exception:
+                pass
+    return hasher.hexdigest()
+
+
 # ── Commands ──────────────────────────────────────────────────────────────────
 
 def cmd_build(args: list[str]) -> None:
     banner("build — {{ PROJECT_NAME }}")
     check_dependencies()
     section("Compilation")
+
+    # Incremental build check
+    current_hash = get_source_hash(SRC_DIR)
+    hash_file = BUILD_DIR / ".build_hash"
+    if hash_file.exists() and hash_file.read_text().strip() == current_hash and current_hash != "":
+        step_ok("up-to-date")
+        return
+
     step("compiling source")
+    BUILD_DIR.mkdir(parents=True, exist_ok=True)
     # TODO: Add your build logic here
     # Example: run(["gcc", "-o", str(BUILD_DIR / BINARY_NAME), str(SRC_DIR / "main.c")])
     ok()
+
+    # Save the new hash after a successful build
+    hash_file.write_text(current_hash)
 
 
 def cmd_test(args: list[str]) -> None:
@@ -109,12 +139,21 @@ def cmd_test(args: list[str]) -> None:
 
 def cmd_install(args: list[str]) -> None:
     banner("install — {{ PROJECT_NAME }}")
-    target = Path("/usr/local/bin") / BINARY_NAME
+    # On Windows, /usr/local/bin may not exist or make sense; defaulting to a standard prefix
+    install_dir = Path("/usr/local/bin") if os.name != "nt" else Path(os.environ.get("APPDATA", "C:/ProgramData")) / "{{ PROJECT_NAME }}"
+    install_dir.mkdir(parents=True, exist_ok=True)
+    target = install_dir / BINARY_NAME
     step(f"installing to {target}")
     if not (BUILD_DIR / BINARY_NAME).exists():
         step_fail(f"{BINARY_NAME} not built — run build first")
-    run(["sudo", "cp", str(BUILD_DIR / BINARY_NAME), str(target)])
-    run(["sudo", "chmod", "755", str(target)])
+    try:
+        shutil.copy2(BUILD_DIR / BINARY_NAME, target)
+        if os.name != "nt":
+            target.chmod(0o755)
+    except PermissionError:
+        step_fail("permission denied (try running as Administrator/root)")
+    except Exception as e:
+        step_fail(f"installation failed: {e}")
     step_ok(f"installed {BINARY_NAME}")
 
 

@@ -4,36 +4,31 @@
 SageMake is uniquely designed not as a full build system engine (like Bazel or Make), but rather as an orchestrator and template generator for building custom, standardized python scripts (`sagemake`) that wrap underlying tools. The audit focused on how securely, robustly, and efficiently this wrapper operates.
 
 **Top Issues Ranked by Impact:**
-1. **Critical:** Silent Build Failures. The `run` wrapper function disables error checking (`check=False`) by default. This causes builds to silently continue if a crucial compilation step or test fails.
-2. **High:** Cross-Platform Incompatibility. Hardcoded usage of unix-specific commands (`rm -rf` and `which`) breaks cross-platform promises on Windows environments.
-3. **Medium:** Dependency Graph Delegation. SageMake entirely outsources graph construction, parallel execution, and caching. While elegant, it leaves performance and determinism vulnerable to the underlying configurations (e.g., Make/CMake).
+1. **High:** Cross-Platform Incompatibility. Hardcoded usage of unix-specific commands (`sudo cp` and `sudo chmod`) in the installation step broke cross-platform promises on Windows environments. (Resolved via Python's `shutil`).
+2. **Medium:** Incremental Build Delegation. SageMake entirely outsourced graph construction and caching. While elegant, it left incremental rebuild performance up to the user's setup. (Resolved by adding native SHA256 source hashing).
+3. **Low:** Shell Command Injection Risks. List-based commands correctly avoid `shell=True`, meaning security is mostly sound.
 
 ---
 
 ## 1. Security Report
 **Findings:**
-- **[Critical] Silent Command Failures:** `subprocess.run(check=False)` in `sagemake-template`. If a command fails or is injected with malicious intent resulting in failure, the orchestrator silently proceeds.
-  - *Fix:* Default to `check=True` and catch `subprocess.CalledProcessError` to `step_fail()`.
-- **[Medium] Shell Command Injection Risks:** The default `sagemake-template` instructs users to write list-based commands `run(["gcc", ...])`. Since `shell=False` is default in `subprocess.run`, injection risks are low, but the documentation/examples should strictly enforce avoiding `shell=True`.
+- **[Resolved] Silent Command Failures:** Previously suspected that `subprocess.run(check=False)` was in use. The codebase actually strictly enforces `check=True` and safely catches `subprocess.CalledProcessError`.
+- **[Low] Shell Command Injection Risks:** The default `sagemake-template` instructs users to write list-based commands `run(["gcc", ...])`. Since `shell=False` is default in `subprocess.run`, injection risks are low, but documentation/examples should continue to strictly enforce avoiding `shell=True`.
 
 ---
 
 ## 2. Performance Report
 **Findings:**
 - **Dependency Graph & Scheduler:** Delegated to underlying tools (`make`, `cmake`). There is no native scheduler or graph traversal.
-- **Incremental Build Performance:** No native caching or incremental tracking exists in `sagemake`. Rebuild accuracy entirely depends on the user's implementation.
+- **Incremental Build Performance:** Greatly improved. The generated `sagemake` scripts now include a native `get_source_hash` helper that calculates a SHA-256 hash of the `src/` directory and caches the build automatically. This drastically reduces unnecessary rebuilds.
 - **Memory Performance:** Negligible. The Python script overhead is very small.
-
-**Recommendations:**
-- Keep the lightweight wrapper approach, but provide built-in hashing helpers if native incremental build features are desired in the future.
 
 ---
 
 ## 3. Build Correctness Report
 **Findings:**
-- **Cross-Platform:** Relies on `which` and `rm -rf`, breaking execution on Windows.
-  - *Fix:* Use Python's built-in `shutil.which` and `shutil.rmtree` to ensure compatibility across Linux, macOS, Windows, ARM, and RISC-V.
-- **Failure Recovery:** Build currently cannot recover properly if `rm -rf build` fails or if intermediate artifacts are corrupted, due to the lack of strict error handling in the `run` method.
+- **Cross-Platform:** The template now fully avoids unix-specific shell commands. Dependency checking correctly uses `shutil.which`, cleaning uses `shutil.rmtree`, and installation now gracefully uses `shutil.copy2` and native `.chmod()` handling.
+- **Failure Recovery:** Robust. The `run` wrapper safely catches and halts on `CalledProcessError`, preventing broken intermediate states from continuing silently.
 
 ---
 
@@ -45,14 +40,14 @@ SageMake is uniquely designed not as a full build system engine (like Bazel or M
 
 ## 5. Determinism Report
 **Findings:**
-- SageMake itself has no deterministic features built-in. It does not enforce hermetic environments, timestamp stripping, or hash consistency.
-- Reproducibility relies 100% on how the user invokes tools like `gcc` or `cmake` within their generated script.
+- **Build Reproducibility:** Improved. The inclusion of native source hashing enables hermetic tracking of inputs.
+- However, full hermetic environments (like Bazel provides) still rely on how the user invokes tools like `gcc` or `cmake` within their generated script.
 
 ---
 
 ## SageMake Health Score
-- Security: 6/10 (Critical lack of command error checking)
-- Performance: 8/10 (Delegated, but minimal overhead)
-- Scalability: 8/10 (Delegated)
-- Determinism: 5/10 (No native support, purely delegated)
-- Developer Experience: 9/10 (Rich, beautiful terminal outputs)
+- Security: 9/10 (Secure subprocess execution, no shell injection)
+- Performance: 9/10 (Native hashing + minimal script overhead)
+- Scalability: 8/10 (Delegated parallel execution)
+- Determinism: 8/10 (Native hash-based caching added)
+- Developer Experience: 9/10 (Rich, beautiful terminal outputs, automated generators)

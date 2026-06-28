@@ -101,8 +101,8 @@ def get_source_hash(directory: Path) -> str:
             hasher.update(filepath.relative_to(directory).as_posix().encode("utf-8"))
             try:
                 hasher.update(filepath.read_bytes())
-            except Exception:
-                pass
+            except Exception as e:
+                step_fail(f"failed to read {filepath} for hashing: {e}")
     return hasher.hexdigest()
 
 
@@ -141,12 +141,12 @@ def cmd_install(args: list[str]) -> None:
     banner("install — {{ PROJECT_NAME }}")
     # On Windows, /usr/local/bin may not exist or make sense; defaulting to a standard prefix
     install_dir = Path("/usr/local/bin") if os.name != "nt" else Path(os.environ.get("APPDATA", "C:/ProgramData")) / "{{ PROJECT_NAME }}"
-    install_dir.mkdir(parents=True, exist_ok=True)
     target = install_dir / BINARY_NAME
     step(f"installing to {target}")
     if not (BUILD_DIR / BINARY_NAME).exists():
         step_fail(f"{BINARY_NAME} not built — run build first")
     try:
+        install_dir.mkdir(parents=True, exist_ok=True)
         shutil.copy2(BUILD_DIR / BINARY_NAME, target)
         if os.name != "nt":
             target.chmod(0o755)
@@ -162,7 +162,10 @@ def cmd_clean(args: list[str]) -> None:
     section("Removing build artifacts")
     step(f"removing {BUILD_DIR}")
     if BUILD_DIR.exists():
-        shutil.rmtree(BUILD_DIR)
+        try:
+            shutil.rmtree(BUILD_DIR)
+        except Exception as e:
+            step_fail(f"failed to remove build dir: {e}")
     ok()
 
 
@@ -182,7 +185,7 @@ def check_dependencies() -> None:
         step(f"checking {dep}")
         if shutil.which(dep) is None:
             missing.append(dep)
-            step_fail(f"{dep} not found")
+            print(f"{RED}✗ not found{RESET}")
         else:
             ok()
     if missing:

@@ -146,7 +146,8 @@ def generate_sagemake(info: dict) -> Path:
     output_file = project_dir / "sagemake"
     _step(f"writing {output_file}")
     output_file.write_text(content)
-    output_file.chmod(0o755)
+    if os.name != "nt":
+        output_file.chmod(0o755)
     _ok()
 
     return output_file

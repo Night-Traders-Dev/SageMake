@@ -115,6 +115,11 @@ def collect_project_info() -> dict:
     return info
 
 
+def escape_str(s: str) -> str:
+    """Escape backslashes and double quotes to prevent template injection."""
+    return s.replace('\\', '\\\\').replace('"', '\\"')
+
+
 def generate_sagemake(info: dict) -> Path:
     """Read the template, replace placeholders, and write the output."""
     _banner("Generating sagemake")
@@ -129,9 +134,9 @@ def generate_sagemake(info: dict) -> Path:
     # Replace placeholders
     _step("substituting variables")
     replacements = {
-        "{{ PROJECT_NAME }}": info["project_name"],
-        "{{ PROJECT_DESCRIPTION }}": info["project_description"],
-        "{{ BINARY_NAME }}": info["binary_name"],
+        "{{ PROJECT_NAME }}": escape_str(info["project_name"]),
+        "{{ PROJECT_DESCRIPTION }}": escape_str(info["project_description"]),
+        "{{ BINARY_NAME }}": escape_str(info["binary_name"]),
         "{{ DEPENDENCIES }}": str(info["dependencies_list"]),
     }
     for placeholder, value in replacements.items():

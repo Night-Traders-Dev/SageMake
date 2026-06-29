@@ -96,11 +96,19 @@ def get_source_hash(directory: Path) -> str:
     if not directory.exists():
         return ""
     hasher = hashlib.sha256()
-    for filepath in sorted(directory.rglob("*")):
+    for filepath in sorted(directory.rglob("*"), key=lambda p: p.as_posix()):
         if filepath.is_file():
-            hasher.update(filepath.relative_to(directory).as_posix().encode("utf-8"))
+            # Add path length and path with null byte delimiter to prevent collision
+            path_bytes = filepath.relative_to(directory).as_posix().encode("utf-8")
+            hasher.update(len(path_bytes).to_bytes(8, byteorder='big'))
+            hasher.update(path_bytes)
+            hasher.update(b"\0")
+
             try:
-                hasher.update(filepath.read_bytes())
+                content = filepath.read_bytes()
+                # Add content length to prevent collision
+                hasher.update(len(content).to_bytes(8, byteorder='big'))
+                hasher.update(content)
             except Exception as e:
                 step_fail(f"failed to read {filepath} for hashing: {e}")
     return hasher.hexdigest()
@@ -116,7 +124,8 @@ def cmd_build(args: list[str]) -> None:
     # Incremental build check
     current_hash = get_source_hash(SRC_DIR)
     hash_file = BUILD_DIR / ".build_hash"
-    if hash_file.exists() and hash_file.read_text().strip() == current_hash and current_hash != "":
+    binary_file = BUILD_DIR / BINARY_NAME
+    if hash_file.exists() and hash_file.read_text().strip() == current_hash and current_hash != "" and binary_file.exists():
         step_ok("up-to-date")
         return
 

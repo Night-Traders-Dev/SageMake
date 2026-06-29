@@ -4,11 +4,13 @@
 SageMake operates uniquely: it is not a traditional build system engine. Instead, it is a lightweight Python-based CLI framework and template generator that standardizes how build scripts are written, executed, and displayed. The audit focused on how securely, robustly, deterministically, and efficiently this wrapper operates across platforms.
 
 **Top Issues Ranked by Impact:**
-1. **High:** Determinism Violation / Cache Bug. A silent `pass` during source file hashing meant unreadable files were silently ignored, causing incorrect hashes and breaking cache determinism. *Fix implemented: Replaced `pass` with `step_fail()` to ensure all file read errors halt the pipeline.*
-2. **Medium:** Unhandled Exceptions on Install/Clean. `cmd_install` created directories outside exception blocks leading to unhandled `PermissionError`s, and `cmd_clean` lacked error handling during `shutil.rmtree()`, causing crashes on Windows when files were locked. *Fix implemented: Wrapped these operations in proper `try...except` blocks.*
-3. **Low:** Poor Developer Experience in Dependency Checking. The `check_dependencies` function exited early on the first missing tool instead of reporting all missing tools at once. *Fix implemented: Modified the function to collect and report all missing dependencies simultaneously.*
-4. **Low:** Cross-Platform Incompatibility on Generation. `sagemake` called `.chmod(0o755)` without checking the OS, potentially causing issues on Windows. *Fix implemented: Guarded with `if os.name != "nt":`.*
-5. **Low:** Shell Command Injection Risks. List-based commands used in `subprocess.run` avoid `shell=True` correctly, making security mostly sound.
+1. **Critical:** Template Injection Vulnerability. User inputs were directly substituted into the generated python template. A malicious user input could result in arbitrary code execution during build times across projects. *Fix implemented: Addressed by creating an `escape_str` helper function that escapes backslashes and double quotes in inputs before substitution.*
+2. **High:** Determinism Violation / Cache Collisions. The hash algorithm simply concatenated the path bytes and content bytes, susceptible to hash collision. It also used an OS-dependent `Path` objects sort leading to un-reproducible caches across OSs. A silent `pass` during source file hashing meant unreadable files were silently ignored. *Fix implemented: Sort explicitly by `.as_posix()`. Appended 64-bit length prefixes and null bytes to disambiguate the hash block, and replaced `pass` with `step_fail()` to ensure all file read errors halt the pipeline.*
+3. **Medium:** Incremental Build Inaccuracy. The build check incorrectly only evaluated if `.build_hash` matched. Thus, manually deleted build outputs skipped compilation while remaining absent. *Fix implemented: The cache logic now correctly ensures the final `BINARY_NAME` artifact exists before skipping the build.*
+4. **Medium:** Unhandled Exceptions on Install/Clean. `cmd_install` created directories outside exception blocks leading to unhandled `PermissionError`s, and `cmd_clean` lacked error handling during `shutil.rmtree()`, causing crashes on Windows when files were locked. *Fix implemented: Wrapped these operations in proper `try...except` blocks.*
+5. **Low:** Poor Developer Experience in Dependency Checking. The `check_dependencies` function exited early on the first missing tool instead of reporting all missing tools at once. *Fix implemented: Modified the function to collect and report all missing dependencies simultaneously.*
+6. **Low:** Cross-Platform Incompatibility on Generation. `sagemake` called `.chmod(0o755)` without checking the OS, potentially causing issues on Windows. *Fix implemented: Guarded with `if os.name != "nt":`.*
+7. **Low:** Shell Command Injection Risks. List-based commands used in `subprocess.run` avoid `shell=True` correctly, making security mostly sound.
 
 ---
 
@@ -25,10 +27,11 @@ SageMake is a single, self-contained Python 3 orchestrator that replaces traditi
 
 ## Security Report (Phase 2)
 **Findings:**
+- **Critical: Template Injection:** Fixed an issue where project metadata from user inputs were directly substituted into `sagemake` Python code without escaping, enabling malicious python code execution.
 - **Silent Command Failures:** The codebase correctly enforces `subprocess.run(check=True)` and catches `subprocess.CalledProcessError`, avoiding silent pipeline failures.
 - **Shell Command Injection Risks:** The generator template properly uses list-based command arrays (e.g., `run(["gcc", ...])`) avoiding `shell=True` by default.
 - **Dependency Resolution:** No native remote artifact fetching is implemented, mitigating supply chain spoofing risks directly within SageMake itself.
-- **Cache Security:** Hashes are generated securely using SHA-256 natively via `hashlib`, reducing cache poisoning risks.
+- **Cache Security:** Hashes are generated securely using SHA-256 natively via `hashlib`. Collision resistance is now augmented by length-prefixing and null byte insertion.
 
 ---
 
@@ -56,14 +59,14 @@ SageMake is a single, self-contained Python 3 orchestrator that replaces traditi
 
 ## Determinism Report (Phase 5)
 **Findings:**
-- **Build Reproducibility:** Hermetic cache tracking is implemented correctly using `sorted(directory.rglob("*"))`. The critical silent failure bug in reading file contents was fixed, guaranteeing that permission errors or I/O failures do not silently break determinism.
+- **Build Reproducibility:** Hermetic cache tracking is implemented correctly using deterministic sorting `sorted(directory.rglob("*"), key=lambda p: p.as_posix())`. The critical silent failure bug in reading file contents was fixed, guaranteeing that permission errors or I/O failures do not silently break determinism. Cache collision attacks are mitigated via null byte insertion and length prefixing.
 - **Hidden State Dependencies:** No hidden dependencies found. All tool validations are explicit via the `check_dependencies()` matrix.
 
 ---
 
 ## SageMake Health Score
-- **Security:** 9/10 (Secure subprocess execution, no shell injection)
+- **Security:** 10/10 (Secure subprocess execution, no shell injection, no template injection)
 - **Performance:** 9/10 (Native SHA256 hashing + minimal Python overhead)
 - **Scalability:** 8/10 (Delegated parallel execution limits internal scale)
-- **Determinism:** 10/10 (Robust hashing and file tracking, previously 8/10)
+- **Determinism:** 10/10 (Robust hashing, collision-resistance, and OS-independent file tracking)
 - **Developer Experience:** 10/10 (Rich terminal outputs, comprehensive missing-tool reporting)

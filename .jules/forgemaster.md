@@ -24,6 +24,11 @@
   - *Unhandled Exception in Clean*: `cmd_clean` lacked exception handling during `shutil.rmtree()`, causing unhandled failures, especially on Windows when files might be locked. **Fixed**: Wrapped removal in `try...except`.
   - *Unsafe chmod*: `sagemake` called `.chmod()` without an OS check during generation. **Fixed**: Wrapped in `if os.name != "nt"`.
 
+- *Path Traversal Vulnerabilities*: User inputs (like project name and binary name) were vulnerable to directory traversal attacks since `.` or `/` characters were allowed. **Fixed**: Added input validation blocking these characters in `sagemake`.
+- *Performance/Scalability of Hashing*: `get_source_hash` loaded the entire file content into memory using `read_bytes()`, limiting scalability. **Fixed**: Modified hashing to process files in 8192-byte chunks using `st_size` for size prefixing.
+- *Determinism around File Modes*: The source hash did not track file permission changes (like executable bit changes), leading to deterministic misses. **Fixed**: Included `st_mode` and `st_size` in the block to trace the source file's metadata.
+- *Cache Corruption on Interruption*: Saving the source hash directly back into `.build_hash` could lead to a corrupt or half-written cache if interrupted. **Fixed**: Switched to using an atomic write strategy via `.tmp` file and `replace()`.
+
 ## Completed Actions
 - Replaced silent `pass` in `get_source_hash` with `step_fail()` in `sagemake-template`.
 - Replaced early exit in `check_dependencies` with complete error reporting in `sagemake-template`.
@@ -32,3 +37,7 @@
 - Fixed Template Injection vulnerability in `sagemake`.
 - Fixed Cache Collisions and Non-Deterministic Sorting in `sagemake-template`.
 - Fixed Incremental Build Inaccuracy in `sagemake-template`.
+- Added input validation for project name and binary name to prevent Path Traversal in `sagemake`.
+- Modified `get_source_hash` to read files in chunks to improve scalability in `sagemake-template`.
+- Added `st_mode` and `st_size` to the hash generation to detect permission changes in `sagemake-template`.
+- Added atomic write via `.tmp` swap to `cmd_build` when writing to `.build_hash` to prevent Cache Corruption in `sagemake-template`.

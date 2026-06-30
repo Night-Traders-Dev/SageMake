@@ -105,10 +105,16 @@ def get_source_hash(directory: Path) -> str:
             hasher.update(b"\0")
 
             try:
-                content = filepath.read_bytes()
-                # Add content length to prevent collision
-                hasher.update(len(content).to_bytes(8, byteorder='big'))
-                hasher.update(content)
+                # Add file stat metadata (mode and size) to detect changes correctly
+                st = filepath.stat()
+                hasher.update(st.st_mode.to_bytes(8, byteorder='big'))
+
+                # Add content length to prevent collision and stream in chunks for scalability
+                hasher.update(st.st_size.to_bytes(8, byteorder='big'))
+
+                with open(filepath, "rb") as f:
+                    while chunk := f.read(8192):
+                        hasher.update(chunk)
             except Exception as e:
                 step_fail(f"failed to read {filepath} for hashing: {e}")
     return hasher.hexdigest()
@@ -135,8 +141,10 @@ def cmd_build(args: list[str]) -> None:
     # Example: run(["gcc", "-o", str(BUILD_DIR / BINARY_NAME), str(SRC_DIR / "main.c")])
     ok()
 
-    # Save the new hash after a successful build
-    hash_file.write_text(current_hash)
+    # Save the new hash after a successful build (atomic write to prevent corruption)
+    tmp_hash_file = hash_file.with_name(hash_file.name + '.tmp')
+    tmp_hash_file.write_text(current_hash)
+    tmp_hash_file.replace(hash_file)
 
 
 def cmd_test(args: list[str]) -> None:

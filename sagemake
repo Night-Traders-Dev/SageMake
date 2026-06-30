@@ -75,14 +75,20 @@ def collect_project_info() -> dict:
     _banner("Project Information")
 
     info["project_name"] = _input("Project name", "my-sage-project")
+    if "/" in info["project_name"] or "\\" in info["project_name"] or ".." in info["project_name"]:
+        _step_fail("project name cannot contain '/', '\\', or '..'")
+
     info["project_description"] = _input(
         "Short description",
         "A Sage-based project",
     )
+
     info["binary_name"] = _input(
         "Binary / output name",
         info["project_name"].replace("-", "_"),
     )
+    if "/" in info["binary_name"] or "\\" in info["binary_name"] or ".." in info["binary_name"]:
+        _step_fail("binary name cannot contain '/', '\\', or '..'")
     info["dependencies"] = _input(
         "Required dependencies (comma-separated)",
         "gcc, make",

@@ -75,8 +75,8 @@ def collect_project_info() -> dict:
     _banner("Project Information")
 
     info["project_name"] = _input("Project name", "my-sage-project")
-    if "/" in info["project_name"] or "\\" in info["project_name"] or ".." in info["project_name"]:
-        _step_fail("project name cannot contain '/', '\\', or '..'")
+    if any(c in info["project_name"] for c in ("/", "\\", "..", ":", ".")):
+        _step_fail("project name cannot contain '/', '\\', '..', ':', or '.'")
 
     info["project_description"] = _input(
         "Short description",
@@ -87,8 +87,8 @@ def collect_project_info() -> dict:
         "Binary / output name",
         info["project_name"].replace("-", "_"),
     )
-    if "/" in info["binary_name"] or "\\" in info["binary_name"] or ".." in info["binary_name"]:
-        _step_fail("binary name cannot contain '/', '\\', or '..'")
+    if any(c in info["binary_name"] for c in ("/", "\\", "..", ":", ".")):
+        _step_fail("binary name cannot contain '/', '\\', '..', ':', or '.'")
     info["dependencies"] = _input(
         "Required dependencies (comma-separated)",
         "gcc, make",
@@ -134,7 +134,7 @@ def generate_sagemake(info: dict) -> Path:
     _step("reading template")
     if not TEMPLATE.exists():
         _step_fail(f"template not found at {TEMPLATE}")
-    content = TEMPLATE.read_text()
+    content = TEMPLATE.read_text(encoding="utf-8")
     _ok()
 
     # Replace placeholders
@@ -156,7 +156,7 @@ def generate_sagemake(info: dict) -> Path:
     # Write output file
     output_file = project_dir / "sagemake"
     _step(f"writing {output_file}")
-    output_file.write_text(content)
+    output_file.write_text(content, encoding="utf-8")
     if os.name != "nt":
         output_file.chmod(0o755)
     _ok()

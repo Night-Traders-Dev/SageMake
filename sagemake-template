@@ -96,10 +96,22 @@ def get_source_hash(directory: Path) -> str:
     if not directory.exists():
         return ""
     hasher = hashlib.sha256()
-    for filepath in sorted(directory.rglob("*"), key=lambda p: p.as_posix()):
+
+    # Also hash this script itself to track build logic changes
+    script_path = Path(__file__).resolve()
+    if script_path.exists():
+        files_to_hash = [script_path] + list(sorted(directory.rglob("*"), key=lambda p: p.as_posix()))
+    else:
+        files_to_hash = list(sorted(directory.rglob("*"), key=lambda p: p.as_posix()))
+
+    for filepath in files_to_hash:
         if filepath.is_file():
             # Add path length and path with null byte delimiter to prevent collision
-            path_bytes = filepath.relative_to(directory).as_posix().encode("utf-8")
+            if filepath == script_path:
+                path_bytes = b"__sagemake_script__"
+            else:
+                path_bytes = filepath.relative_to(directory).as_posix().encode("utf-8")
+
             hasher.update(len(path_bytes).to_bytes(8, byteorder='big'))
             hasher.update(path_bytes)
             hasher.update(b"\0")
@@ -131,7 +143,7 @@ def cmd_build(args: list[str]) -> None:
     current_hash = get_source_hash(SRC_DIR)
     hash_file = BUILD_DIR / ".build_hash"
     binary_file = BUILD_DIR / BINARY_NAME
-    if hash_file.exists() and hash_file.read_text().strip() == current_hash and current_hash != "" and binary_file.exists():
+    if hash_file.exists() and hash_file.read_text(encoding="utf-8").strip() == current_hash and current_hash != "" and binary_file.exists():
         step_ok("up-to-date")
         return
 
@@ -143,7 +155,7 @@ def cmd_build(args: list[str]) -> None:
 
     # Save the new hash after a successful build (atomic write to prevent corruption)
     tmp_hash_file = hash_file.with_name(hash_file.name + '.tmp')
-    tmp_hash_file.write_text(current_hash)
+    tmp_hash_file.write_text(current_hash, encoding="utf-8")
     tmp_hash_file.replace(hash_file)
 
 

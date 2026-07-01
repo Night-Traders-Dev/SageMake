@@ -28,8 +28,14 @@
 - *Performance/Scalability of Hashing*: `get_source_hash` loaded the entire file content into memory using `read_bytes()`, limiting scalability. **Fixed**: Modified hashing to process files in 8192-byte chunks using `st_size` for size prefixing.
 - *Determinism around File Modes*: The source hash did not track file permission changes (like executable bit changes), leading to deterministic misses. **Fixed**: Included `st_mode` and `st_size` in the block to trace the source file's metadata.
 - *Cache Corruption on Interruption*: Saving the source hash directly back into `.build_hash` could lead to a corrupt or half-written cache if interrupted. **Fixed**: Switched to using an atomic write strategy via `.tmp` file and `replace()`.
+  - *Encoding UnicodeDecodeError on Windows*: Missing `encoding="utf-8"` on `read_text` and `write_text` would crash the generator on CP1252/Windows systems due to UTF-8 specific characters (ANSI/em-dashes). **Fixed**: Explicitly specified `encoding="utf-8"`.
+  - *Hidden State Determinism Violation*: Changes in the build script (`sagemake`) itself did not invalidate the cache, leading to out-of-date builds if compiler flags or build logic changed. **Fixed**: Modified `get_source_hash` to natively hash the `sagemake` script itself alongside `src/`.
+  - *Input Path Traversal Edge Cases*: Project and binary names weren't blocking `:` (Windows drive letters) or `.` (current directory), allowing edge case exploits/file overwrites. **Fixed**: Blocked these characters explicitly.
 
 ## Completed Actions
+- Added `encoding="utf-8"` to all `read_text` and `write_text` calls to support Windows.
+- Modified `get_source_hash` to hash the script itself to prevent hidden state determinism bugs.
+- Blocked `:` and `.` characters in project/binary names to fully patch path traversal vulnerabilities.
 - Replaced silent `pass` in `get_source_hash` with `step_fail()` in `sagemake-template`.
 - Replaced early exit in `check_dependencies` with complete error reporting in `sagemake-template`.
 - Fixed unhandled exceptions in `cmd_install` and `cmd_clean` in `sagemake-template`.

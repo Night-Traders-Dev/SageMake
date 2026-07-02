@@ -75,8 +75,8 @@ def collect_project_info() -> dict:
     _banner("Project Information")
 
     info["project_name"] = _input("Project name", "my-sage-project")
-    if any(c in info["project_name"] for c in ("/", "\\", "..", ":", ".")):
-        _step_fail("project name cannot contain '/', '\\', '..', ':', or '.'")
+    if any(c in info["project_name"] for c in ("/", "\\", "..", ":", ".", "\0")):
+        _step_fail("project name cannot contain '/', '\\', '..', ':', '.', or null bytes")
 
     info["project_description"] = _input(
         "Short description",
@@ -87,8 +87,8 @@ def collect_project_info() -> dict:
         "Binary / output name",
         info["project_name"].replace("-", "_"),
     )
-    if any(c in info["binary_name"] for c in ("/", "\\", "..", ":", ".")):
-        _step_fail("binary name cannot contain '/', '\\', '..', ':', or '.'")
+    if any(c in info["binary_name"] for c in ("/", "\\", "..", ":", ".", "\0")):
+        _step_fail("binary name cannot contain '/', '\\', '..', ':', '.', or null bytes")
     info["dependencies"] = _input(
         "Required dependencies (comma-separated)",
         "gcc, make",

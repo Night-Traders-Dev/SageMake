@@ -31,6 +31,7 @@
   - *Encoding UnicodeDecodeError on Windows*: Missing `encoding="utf-8"` on `read_text` and `write_text` would crash the generator on CP1252/Windows systems due to UTF-8 specific characters (ANSI/em-dashes). **Fixed**: Explicitly specified `encoding="utf-8"`.
   - *Hidden State Determinism Violation*: Changes in the build script (`sagemake`) itself did not invalidate the cache, leading to out-of-date builds if compiler flags or build logic changed. **Fixed**: Modified `get_source_hash` to natively hash the `sagemake` script itself alongside `src/`.
   - *Input Path Traversal Edge Cases*: Project and binary names weren't blocking `:` (Windows drive letters) or `.` (current directory), allowing edge case exploits/file overwrites. **Fixed**: Blocked these characters explicitly.
+  - *Pathlib Null Byte Crashing Edge Cases*: Null bytes (`\0`) in inputs caused uncontrolled exceptions in standard Python filesystem functions. **Fixed**: Blocked null bytes explicitly.
 
 ## Completed Actions
 - Added `encoding="utf-8"` to all `read_text` and `write_text` calls to support Windows.

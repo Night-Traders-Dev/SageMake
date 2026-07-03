@@ -72,6 +72,11 @@ def step_warn(detail: str) -> None:
 
 def run(cmd: list[str], **kwargs) -> subprocess.CompletedProcess:
     """Run a command and return the result."""
+    if "env" in kwargs:
+        kwargs["env"] = {**os.environ, **kwargs["env"]}
+    else:
+        kwargs["env"] = os.environ.copy()
+
     try:
         return subprocess.run(cmd, check=True, **kwargs)
     except subprocess.CalledProcessError as e:

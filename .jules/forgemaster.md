@@ -19,6 +19,7 @@
   - *Non-Deterministic Sorting*: `directory.rglob("*")` was sorted purely by `Path` objects, which compares case-insensitively on Windows but case-sensitively on Linux, leading to differing hashes. **Fixed**: Sorted using `key=lambda p: p.as_posix()`.
   - *Incremental Build Inaccuracy*: The system skipped builds solely if `.build_hash` matched. If the user deleted the output binary but left the hash file, the build falsely succeeded without creating a new binary. **Fixed**: Required `(BUILD_DIR / BINARY_NAME).exists()` to also be true before skipping the build.
 - **Cross-Platform Issues**:
+  - *Environment Variable Drop*: `subprocess.run` drops implicitly inherited variables like `CC`, `CFLAGS`, and `PATH` if any partial `env` is provided, causing cross-platform and compilation failures for underlying tools. **Fixed**: Modified `run()` to merge `os.environ` before executing.
   - *Dependency Checking Bug*: `check_dependencies` exited early on the first missing dependency, which hurts Developer Experience. **Fixed**: Modified it to report all missing dependencies at once.
   - *Unhandled Exception in Install*: `cmd_install` created directories outside the `try...except` block, unhandling `PermissionError` when installing to restricted locations. **Fixed**: Moved directory creation inside the block.
   - *Unhandled Exception in Clean*: `cmd_clean` lacked exception handling during `shutil.rmtree()`, causing unhandled failures, especially on Windows when files might be locked. **Fixed**: Wrapped removal in `try...except`.
@@ -34,6 +35,7 @@
   - *Pathlib Null Byte Crashing Edge Cases*: Null bytes (`\0`) in inputs caused uncontrolled exceptions in standard Python filesystem functions. **Fixed**: Blocked null bytes explicitly.
 
 ## Completed Actions
+- Modified `run()` in `sagemake-template` to merge `os.environ` to preserve `PATH` and compiler variables.
 - Added `encoding="utf-8"` to all `read_text` and `write_text` calls to support Windows.
 - Modified `get_source_hash` to hash the script itself to prevent hidden state determinism bugs.
 - Blocked `:` and `.` characters in project/binary names to fully patch path traversal vulnerabilities.

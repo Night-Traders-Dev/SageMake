@@ -17,6 +17,7 @@ Commands:
 
 import hashlib
 import os
+import platform
 import shutil
 import subprocess
 import sys
@@ -102,18 +103,25 @@ def get_source_hash(directory: Path) -> str:
         return ""
     hasher = hashlib.sha256()
 
+    # Hash the host OS and architecture to prevent cross-platform cache pollution
+    sys_info = f"{platform.system()}-{platform.machine()}".encode("utf-8")
+    hasher.update(len(sys_info).to_bytes(8, byteorder='big'))
+    hasher.update(sys_info)
+    hasher.update(b"\0")
+
     # Also hash this script itself to track build logic changes
     script_path = Path(__file__).resolve()
+    rglob_files = [p for p in sorted(directory.rglob("*"), key=lambda p: p.as_posix()) if p.resolve() != script_path]
     if script_path.exists():
-        files_to_hash = [script_path] + list(sorted(directory.rglob("*"), key=lambda p: p.as_posix()))
+        files_to_hash = [script_path] + rglob_files
     else:
-        files_to_hash = list(sorted(directory.rglob("*"), key=lambda p: p.as_posix()))
+        files_to_hash = rglob_files
 
     for filepath in files_to_hash:
         if filepath.is_file():
             # Add path length and path with null byte delimiter to prevent collision
             if filepath == script_path:
-                path_bytes = b"__sagemake_script__"
+                path_bytes = b"\x00__sagemake_script__"
             else:
                 path_bytes = filepath.relative_to(directory).as_posix().encode("utf-8")
 
@@ -122,9 +130,11 @@ def get_source_hash(directory: Path) -> str:
             hasher.update(b"\0")
 
             try:
-                # Add file stat metadata (mode and size) to detect changes correctly
+                # Add file stat metadata (executable bit and size) to detect changes correctly
+                # We only track the executable bit to prevent umask determinism violations
                 st = filepath.stat()
-                hasher.update(st.st_mode.to_bytes(8, byteorder='big'))
+                exec_bit = 1 if bool(st.st_mode & 0o111) else 0
+                hasher.update(exec_bit.to_bytes(8, byteorder='big'))
 
                 # Add content length to prevent collision and stream in chunks for scalability
                 hasher.update(st.st_size.to_bytes(8, byteorder='big'))

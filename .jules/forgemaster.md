@@ -30,6 +30,9 @@
 - *Determinism around File Modes*: The source hash did not track file permission changes (like executable bit changes), leading to deterministic misses. **Fixed**: Included `st_mode` and `st_size` in the block to trace the source file's metadata.
 - *Cache Corruption on Interruption*: Saving the source hash directly back into `.build_hash` could lead to a corrupt or half-written cache if interrupted. **Fixed**: Switched to using an atomic write strategy via `.tmp` file and `replace()`.
   - *Encoding UnicodeDecodeError on Windows*: Missing `encoding="utf-8"` on `read_text` and `write_text` would crash the generator on CP1252/Windows systems due to UTF-8 specific characters (ANSI/em-dashes). **Fixed**: Explicitly specified `encoding="utf-8"`.
+  - *Cross-Platform Cache Pollution*: The build cache hashing did not include host OS or architecture, meaning shared caches between platforms (e.g., Linux vs Windows) could cause falsely successful incremental builds that result in invalid binaries. **Fixed**: Added `platform.system()` and `platform.machine()` to the hash state.
+  - *Umask Determinism Violation*: The hash function tracked the full raw `st_mode` of files. Different developers checking out code with different umasks (e.g., `644` vs `664`) would have diverging hashes, breaking determinism. **Fixed**: Changed the state track to only hash the executable bit (`st_mode & 0o111`).
+  - *Hash Collision and Duplication with Script Hashing*: Adding the `script_path` could duplicate it if it resided within the hashed directory, and its identifying byte string lacked a null byte delimiter, causing potential collision with real files. **Fixed**: Filtered `script_path` from `rglob` and used `\x00` delimiter.
   - *Hidden State Determinism Violation*: Changes in the build script (`sagemake`) itself did not invalidate the cache, leading to out-of-date builds if compiler flags or build logic changed. **Fixed**: Modified `get_source_hash` to natively hash the `sagemake` script itself alongside `src/`.
   - *Input Path Traversal Edge Cases*: Project and binary names weren't blocking `:` (Windows drive letters) or `.` (current directory), allowing edge case exploits/file overwrites. **Fixed**: Blocked these characters explicitly.
   - *Pathlib Null Byte Crashing Edge Cases*: Null bytes (`\0`) in inputs caused uncontrolled exceptions in standard Python filesystem functions. **Fixed**: Blocked null bytes explicitly.
@@ -50,3 +53,6 @@
 - Modified `get_source_hash` to read files in chunks to improve scalability in `sagemake-template`.
 - Added `st_mode` and `st_size` to the hash generation to detect permission changes in `sagemake-template`.
 - Added atomic write via `.tmp` swap to `cmd_build` when writing to `.build_hash` to prevent Cache Corruption in `sagemake-template`.
+- Added platform OS and architecture into cache hash to prevent Cross-Platform Cache Pollution in `sagemake-template`.
+- Reduced `st_mode` hashing to only the executable bit to fix Umask Determinism Violation in `sagemake-template`.
+- Filtered script path from directory globbing and prefixed with null byte to fix Hash Collisions and Duplication in `sagemake-template`.

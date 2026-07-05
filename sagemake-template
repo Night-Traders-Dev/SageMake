@@ -21,6 +21,7 @@ import platform
 import shutil
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 # ── ANSI helpers ──────────────────────────────────────────────────────────────
@@ -97,7 +98,7 @@ BINARY_NAME = "{{ BINARY_NAME }}"
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
-def get_source_hash(directory: Path) -> str:
+def get_source_hash(directory: Path, args: list[str] = None) -> str:
     """Calculate a single SHA-256 hash for all files in a directory recursively."""
     if not directory.exists():
         return ""
@@ -108,6 +109,24 @@ def get_source_hash(directory: Path) -> str:
     hasher.update(len(sys_info).to_bytes(8, byteorder='big'))
     hasher.update(sys_info)
     hasher.update(b"\0")
+
+    # Hash command-line arguments to prevent caching across different flag invocations
+    if args:
+        for arg in args:
+            arg_bytes = arg.encode("utf-8")
+            hasher.update(len(arg_bytes).to_bytes(8, byteorder='big'))
+            hasher.update(arg_bytes)
+            hasher.update(b"\0")
+
+    # Hash common build environment variables to track hidden compiler states
+    env_vars = ["CC", "CFLAGS", "CXX", "CXXFLAGS", "LDFLAGS", "SAGE_PATH"]
+    for var in env_vars:
+        val = os.environ.get(var, "")
+        if val:
+            val_bytes = f"{var}={val}".encode("utf-8")
+            hasher.update(len(val_bytes).to_bytes(8, byteorder='big'))
+            hasher.update(val_bytes)
+            hasher.update(b"\0")
 
     # Also hash this script itself to track build logic changes
     script_path = Path(__file__).resolve()
@@ -155,12 +174,29 @@ def cmd_build(args: list[str]) -> None:
     section("Compilation")
 
     # Incremental build check
-    current_hash = get_source_hash(SRC_DIR)
+    current_hash = get_source_hash(SRC_DIR, args)
     hash_file = BUILD_DIR / ".build_hash"
     binary_file = BUILD_DIR / BINARY_NAME
-    if hash_file.exists() and hash_file.read_text(encoding="utf-8").strip() == current_hash and current_hash != "" and binary_file.exists():
-        step_ok("up-to-date")
-        return
+
+    # Calculate binary hash if it exists
+    binary_hash = ""
+    if binary_file.exists():
+        b_hasher = hashlib.sha256()
+        try:
+            with open(binary_file, "rb") as f:
+                while chunk := f.read(8192):
+                    b_hasher.update(chunk)
+            binary_hash = b_hasher.hexdigest()
+        except Exception:
+            binary_hash = ""
+
+    combined_hash = f"{current_hash}:{binary_hash}"
+
+    if hash_file.exists() and current_hash != "" and binary_hash != "":
+        cached_hash = hash_file.read_text(encoding="utf-8").strip()
+        if cached_hash == combined_hash:
+            step_ok("up-to-date")
+            return
 
     step("compiling source")
     BUILD_DIR.mkdir(parents=True, exist_ok=True)
@@ -168,10 +204,25 @@ def cmd_build(args: list[str]) -> None:
     # Example: run(["gcc", "-o", str(BUILD_DIR / BINARY_NAME), str(SRC_DIR / "main.c")])
     ok()
 
-    # Save the new hash after a successful build (atomic write to prevent corruption)
-    tmp_hash_file = hash_file.with_name(hash_file.name + '.tmp')
-    tmp_hash_file.write_text(current_hash, encoding="utf-8")
-    tmp_hash_file.replace(hash_file)
+    # Calculate new binary hash after successful build
+    new_binary_hash = ""
+    if binary_file.exists():
+        b_hasher = hashlib.sha256()
+        try:
+            with open(binary_file, "rb") as f:
+                while chunk := f.read(8192):
+                    b_hasher.update(chunk)
+            new_binary_hash = b_hasher.hexdigest()
+        except Exception:
+            new_binary_hash = ""
+
+    new_combined_hash = f"{current_hash}:{new_binary_hash}"
+
+    # Save the new hash after a successful build (atomic write to prevent corruption and race conditions)
+    fd, tmp_path = tempfile.mkstemp(dir=BUILD_DIR, prefix=".build_hash_", suffix=".tmp")
+    with open(fd, "w", encoding="utf-8") as f:
+        f.write(new_combined_hash)
+    Path(tmp_path).replace(hash_file)
 
 
 def cmd_test(args: list[str]) -> None:

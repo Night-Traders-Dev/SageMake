@@ -28,7 +28,7 @@ SageMake is a single, self-contained Python 3 orchestrator that replaces traditi
 
 ---
 
-## Phase 2 — Security Audit
+## Security Report
 **Findings:**
 - **Critical: Template Injection:** Fixed an issue where project metadata from user inputs were directly substituted into `sagemake` Python code without escaping, enabling malicious python code execution.
 - **High: Path Traversal Risks:** Strict input validation handles path traversal strings (`/`, `\`, `..`, `:`, `.`, `\0`), mitigating arbitrary file overwrite and null byte parsing crashes.
@@ -39,7 +39,7 @@ SageMake is a single, self-contained Python 3 orchestrator that replaces traditi
 
 ---
 
-## Phase 3 — Performance Audit
+## Performance Report
 **Findings:**
 - **Dependency Graph Performance:** O(1) overhead for SageMake itself since it defers to `make`/`cmake`.
 - **Scheduler Performance:** Worker utilization depends on underlying tool invocation (e.g., `-j` flags).
@@ -48,7 +48,7 @@ SageMake is a single, self-contained Python 3 orchestrator that replaces traditi
 
 ---
 
-## Phase 4 — Functionality Audit
+## Build Correctness Report
 **Findings:**
 - **Cross-Platform Support:** Strict usage of `shutil.which` for dependency checking, `shutil.rmtree` for cleanup, and `shutil.copy2` / OS-guarded `.chmod()` for installation ensures proper functionality across Linux, macOS, and Windows.
 - **Failure Recovery:** Unhandled exceptions in install/clean were patched, and `CalledProcessError` properly halts execution to prevent partial, broken, or corrupt states.
@@ -62,7 +62,7 @@ SageMake is a single, self-contained Python 3 orchestrator that replaces traditi
 
 ---
 
-## Phase 5 — Determinism Audit
+## Determinism Report
 **Findings:**
 - **Build Reproducibility:** Hermetic cache tracking is implemented correctly using deterministic sorting `sorted(directory.rglob("*"), key=lambda p: p.as_posix())`. The critical silent failure bug in reading file contents was fixed, guaranteeing that permission errors or I/O failures do not silently break determinism. Cache collision attacks are mitigated via null byte insertion and length prefixing. Hashing only the executable bit of `st_mode` avoids umask determinism violations. Hashing the target OS and architecture avoids cross-platform false cache hits.
 - **Hidden State Dependencies:** No hidden dependencies found. All tool validations are explicit via the `check_dependencies()` matrix.

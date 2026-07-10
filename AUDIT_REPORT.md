@@ -88,3 +88,4 @@ SageMake is a single, self-contained Python 3 orchestrator that replaces traditi
 ## Phase 7 — Verification
 **Findings:**
 - All build, test, scalable chunk reads, strict input validation paths were manually tested via interactive CLI flows and pipeline checks, resulting in a successful baseline.
+- **O(N) syscall overhead during globbing**: Calling `.resolve()` on every file in the project resulted in extreme overheads for large projects. Fixed by pre-calculating the script's relative path and comparing using path equality.

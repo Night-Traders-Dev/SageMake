@@ -130,7 +130,15 @@ def get_source_hash(directory: Path, args: list[str] = None) -> str:
 
     # Also hash this script itself to track build logic changes
     script_path = Path(__file__).resolve()
-    rglob_files = [p for p in sorted(directory.rglob("*"), key=lambda p: p.as_posix()) if p.resolve() != script_path]
+
+    try:
+        # Pre-calculate the script path relative to the directory to avoid O(N) resolve() calls
+        script_rel = script_path.relative_to(directory.resolve())
+        script_in_dir = directory / script_rel
+    except ValueError:
+        script_in_dir = None
+
+    rglob_files = [p for p in sorted(directory.rglob("*"), key=lambda p: p.as_posix()) if p != script_in_dir]
     if script_path.exists():
         files_to_hash = [script_path] + rglob_files
     else:

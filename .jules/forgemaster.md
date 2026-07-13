@@ -13,6 +13,7 @@
 - **Correctness/Security**:
   - The original template correctly used `subprocess.run(check=True)` securely, avoiding silent failures.
   - *Template Injection Vulnerability*: User inputs (like project name and binary name) were injected directly into the `sagemake` Python script without escaping. This allowed arbitrary Python code execution if a payload contained double quotes and backslashes. **Fixed**: Introduced `escape_str` helper to safely escape strings before template substitution.
+  - *Unclosed String Literal Syntax Error*: The original `escape_str` logic was flawed for inputs ending with a quote (e.g. `test"` became `test\"`), which resulted in unclosed string literals in the generated Python script (e.g. `BINARY_NAME = "test\""`). **Fixed**: Upgraded `escape_str` to use `json.dumps()[1:-1]` to correctly and robustly escape all control characters, backslashes, and quotes.
 - **Determinism / Incremental Builds**:
   - *Cache Bug in Hashing*: A silent `pass` was used inside `try...except` during source hashing (`get_source_hash`). If reading a file failed, it would silently ignore it, leading to a determinism violation and incorrect cache hashes. **Fixed**: Replaced `pass` with `step_fail()` to ensure errors halt the process.
   - *Cache Collisions*: The hash function simply concatenated path bytes and content bytes. It was susceptible to collision attacks (e.g., path `a`, content `bc` vs path `ab`, content `c`). **Fixed**: Added null byte delimiters and 64-bit length prefixes for both path and content.
@@ -49,6 +50,7 @@
 - Fixed unhandled exceptions in `cmd_install` and `cmd_clean` in `sagemake-template`.
 - Added OS check before `.chmod()` in `sagemake`.
 - Fixed Template Injection vulnerability in `sagemake`.
+- Fixed Unclosed String Literal Syntax Error in `sagemake`.
 - Fixed Cache Collisions and Non-Deterministic Sorting in `sagemake-template`.
 - Fixed Incremental Build Inaccuracy in `sagemake-template`.
 - Added input validation for project name and binary name to prevent Path Traversal in `sagemake`.

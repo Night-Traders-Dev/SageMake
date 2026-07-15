@@ -12,7 +12,7 @@
 ## Major Discoveries
 - **Correctness/Security**:
   - The original template correctly used `subprocess.run(check=True)` securely, avoiding silent failures.
-  - *Template Injection Vulnerability*: User inputs (like project name and binary name) were injected directly into the `sagemake` Python script without escaping. This allowed arbitrary Python code execution if a payload contained double quotes and backslashes. **Fixed**: Introduced `escape_str` helper to safely escape strings before template substitution.
+  - *Template Injection Vulnerability*: User inputs (like project name and binary name) were injected directly into the `sagemake` Python script without escaping. This allowed arbitrary Python code execution if a payload contained double quotes and backslashes. **Fixed**: Introduced `escape_str` helper utilizing `json.dumps` to securely escape strings before template substitution.
 - **Determinism / Incremental Builds**:
   - *Cache Bug in Hashing*: A silent `pass` was used inside `try...except` during source hashing (`get_source_hash`). If reading a file failed, it would silently ignore it, leading to a determinism violation and incorrect cache hashes. **Fixed**: Replaced `pass` with `step_fail()` to ensure errors halt the process.
   - *Cache Collisions*: The hash function simply concatenated path bytes and content bytes. It was susceptible to collision attacks (e.g., path `a`, content `bc` vs path `ab`, content `c`). **Fixed**: Added null byte delimiters and 64-bit length prefixes for both path and content.

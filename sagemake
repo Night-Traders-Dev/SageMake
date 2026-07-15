@@ -121,9 +121,13 @@ def collect_project_info() -> dict:
     return info
 
 
+import json
+
 def escape_str(s: str) -> str:
     """Escape backslashes and double quotes to prevent template injection."""
-    return s.replace('\\', '\\\\').replace('"', '\\"')
+    # json.dumps correctly escapes all control characters, backslashes, and quotes.
+    # It wraps the result in double quotes, which we strip since the template already has them.
+    return json.dumps(s)[1:-1]
 
 
 def generate_sagemake(info: dict) -> Path:

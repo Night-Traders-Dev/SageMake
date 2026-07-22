@@ -123,11 +123,16 @@ def collect_project_info() -> dict:
 
 import json
 
-def escape_str(s: str) -> str:
-    """Escape backslashes and double quotes to prevent template injection."""
-    # json.dumps correctly escapes all control characters, backslashes, and quotes.
-    # It wraps the result in double quotes, which we strip since the template already has them.
-    return json.dumps(s)[1:-1]
+def escape_json(s: str) -> str:
+    """Escape string as a valid JSON string literal to prevent template injection."""
+    # json.dumps correctly escapes all control characters, backslashes, and quotes,
+    # and wraps the result in double quotes. This provides a safe, complete string literal.
+    return json.dumps(s)
+
+
+def sanitize_docstring(s: str) -> str:
+    """Sanitize string for inclusion in a Python docstring (escapes triple quotes and backslashes)."""
+    return s.replace('\\', '\\\\').replace('"""', '\\"\\"\\"')
 
 
 def generate_sagemake(info: dict) -> Path:
@@ -144,9 +149,10 @@ def generate_sagemake(info: dict) -> Path:
     # Replace placeholders
     _step("substituting variables")
     replacements = {
-        "{{ PROJECT_NAME }}": escape_str(info["project_name"]),
-        "{{ PROJECT_DESCRIPTION }}": escape_str(info["project_description"]),
-        "{{ BINARY_NAME }}": escape_str(info["binary_name"]),
+        "{{ PROJECT_NAME_JSON }}": escape_json(info["project_name"]),
+        "{{ BINARY_NAME_JSON }}": escape_json(info["binary_name"]),
+        "{{ PROJECT_NAME_DOC }}": sanitize_docstring(info["project_name"]),
+        "{{ PROJECT_DESCRIPTION_DOC }}": sanitize_docstring(info["project_description"]),
         "{{ DEPENDENCIES }}": str(info["dependencies_list"]),
     }
     for placeholder, value in replacements.items():

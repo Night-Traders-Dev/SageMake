@@ -89,3 +89,6 @@ SageMake is a single, self-contained Python 3 orchestrator that replaces traditi
 **Findings:**
 - All build, test, scalable chunk reads, strict input validation paths were manually tested via interactive CLI flows and pipeline checks, resulting in a successful baseline.
 - **O(N) syscall overhead during globbing**: Calling `.resolve()` on every file in the project resulted in extreme overheads for large projects. Fixed by pre-calculating the script's relative path and comparing using path equality.
+
+## Post-Audit Findings
+- **Follow-up on Template Injection Fix:** The initial fix described above for template injection used `json.dumps(s)[1:-1]` to strip quotes. This was found to be fundamentally flawed and still vulnerable to unclosed string literal syntax errors if the user input ended with a quote (e.g., `a"` would become `a\"` inside a string). I corrected this by modifying `sagemake-template` to accept raw JSON payloads without surrounding string quotes (e.g., `BINARY_NAME = {{ BINARY_NAME_JSON }}`) and updated the generator to preserve `json.dumps` natively without slicing.

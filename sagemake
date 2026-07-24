@@ -126,8 +126,12 @@ import json
 def escape_str(s: str) -> str:
     """Escape backslashes and double quotes to prevent template injection."""
     # json.dumps correctly escapes all control characters, backslashes, and quotes.
-    # It wraps the result in double quotes, which we strip since the template already has them.
-    return json.dumps(s)[1:-1]
+    return json.dumps(s)
+
+
+def escape_docstring(s: str) -> str:
+    """Escape backslashes and triple quotes for safe docstring insertion."""
+    return s.replace("\\", "\\\\").replace('"""', '\\"\\"\\"')
 
 
 def generate_sagemake(info: dict) -> Path:
@@ -144,10 +148,11 @@ def generate_sagemake(info: dict) -> Path:
     # Replace placeholders
     _step("substituting variables")
     replacements = {
-        "{{ PROJECT_NAME }}": escape_str(info["project_name"]),
-        "{{ PROJECT_DESCRIPTION }}": escape_str(info["project_description"]),
-        "{{ BINARY_NAME }}": escape_str(info["binary_name"]),
-        "{{ DEPENDENCIES }}": str(info["dependencies_list"]),
+        "{{ PROJECT_NAME_DOC }}": escape_docstring(info["project_name"]),
+        "{{ PROJECT_DESCRIPTION_DOC }}": escape_docstring(info["project_description"]),
+        "{{ PROJECT_NAME_JSON }}": escape_str(info["project_name"]),
+        "{{ BINARY_NAME_JSON }}": escape_str(info["binary_name"]),
+        "{{ DEPENDENCIES_JSON }}": escape_str(info["dependencies_list"]),
     }
     for placeholder, value in replacements.items():
         content = content.replace(placeholder, value)

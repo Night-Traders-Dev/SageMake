@@ -65,3 +65,5 @@
 All tasks completed and delivered successfully.
 - **Performance**:
   - *O(N) syscall overhead during globbing*: During the globbing of source files to hash, calling `p.resolve() != script_path` evaluated to calling `.resolve()` on every file in the project. This led to O(N) syscalls across potentially thousands of files, slowing down builds drastically. **Fixed**: Modified `sagemake-template` to calculate the relative path to `script_path` once before the loop, and filter by simple path equality checking.
+- **Further Correctness/Security**:
+  - *Template Injection via raw placeholders*: Using `.replace()` on strings injected raw user strings (and imperfectly-stripped JSON strings) straight into template code. This approach is brittle and potentially introduces injection vectors or syntax errors. **Fixed**: Modified `sagemake-template` to utilize standard formatting (e.g. `f"build — {PROJECT_NAME}"`) using properly sanitized variables like `PROJECT_NAME = {{ PROJECT_NAME_JSON }}` where `PROJECT_NAME_JSON` is substituted using exactly `json.dumps()` without stripping quotes. Docstrings use a specialized triple-quote and backslash escaper (`escape_docstring`).

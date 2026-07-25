@@ -65,3 +65,6 @@
 All tasks completed and delivered successfully.
 - **Performance**:
   - *O(N) syscall overhead during globbing*: During the globbing of source files to hash, calling `p.resolve() != script_path` evaluated to calling `.resolve()` on every file in the project. This led to O(N) syscalls across potentially thousands of files, slowing down builds drastically. **Fixed**: Modified `sagemake-template` to calculate the relative path to `script_path` once before the loop, and filter by simple path equality checking.
+
+### Template String Injection Fixed
+- Fixed a Template Injection Vulnerability in `sagemake` where the user input list for `dependencies` was injected into the generated string using `str()`, rather than escaping properly. Upgraded `escape_str` to appropriately use `json.dumps()` in the `generate_sagemake` function.

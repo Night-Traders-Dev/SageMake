@@ -153,7 +153,7 @@ def generate_sagemake(info: dict) -> Path:
         "{{ BINARY_NAME_JSON }}": escape_json(info["binary_name"]),
         "{{ PROJECT_NAME_DOC }}": sanitize_docstring(info["project_name"]),
         "{{ PROJECT_DESCRIPTION_DOC }}": sanitize_docstring(info["project_description"]),
-        "{{ DEPENDENCIES }}": str(info["dependencies_list"]),
+        "{{ DEPENDENCIES }}": json.dumps(info["dependencies_list"]),
     }
     for placeholder, value in replacements.items():
         content = content.replace(placeholder, value)

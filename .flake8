@@ -1,0 +1,3 @@
+[flake8]
+per-file-ignores =
+    sagemake-template: E201, E202, E501, E731, F821

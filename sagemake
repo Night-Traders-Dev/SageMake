@@ -6,13 +6,12 @@ Guides the user through creating a custom sagemake for their own
 Sage-based project using sagemake-template as the starting point.
 """
 
+import json
 import os
-import shutil
-import subprocess
 import sys
 from pathlib import Path
 
-# ── ANSI helpers ──────────────────────────────────────────────────────────────
+# ── ANSI helpers ─────────────────────────────────────────────────────────────
 
 RESET = "\033[0m"
 BOLD = "\033[1m"
@@ -27,33 +26,84 @@ try:
     from rich.console import Console
     from rich.prompt import Prompt, Confirm
     from rich.panel import Panel
-    from rich.syntax import Syntax
     from rich.table import Table
     RICH = True
     console = Console()
-    _banner = lambda t: console.print(Panel(f"[bold cyan]{t}[/]", border_style="cyan"))
-    _section = lambda t: console.print(f"  [cyan]→[/] {t}")
-    _step = lambda t: console.print(f"    {t} ... ", end="")
-    _ok = lambda: console.print("[green]✓ done[/]")
-    _fail = lambda: console.print("[red]✗ failed[/]")
-    _step_ok = lambda d: console.print(f"[green]✓ {d}[/]")
-    _step_fail = lambda d: console.print(f"[red]✗ {d}[/]") or sys.exit(1)
-    _input = lambda p, d="": Prompt.ask(p, default=d) if d else Prompt.ask(p)
-    _confirm = lambda p, d=True: Confirm.ask(p, default=d)
+
+    def _banner(t):
+        console.print(Panel(f"[bold cyan]{t}[/]", border_style="cyan"))
+
+    def _section(t):
+        console.print(f"  [cyan]→[/] {t}")
+
+    def _step(t):
+        console.print(f"    {t} ... ", end="")
+
+    def _ok():
+        console.print("[green]✓ done[/]")
+
+    def _fail():
+        console.print("[red]✗ failed[/]")
+
+    def _step_ok(d):
+        console.print(f"[green]✓ {d}[/]")
+
+    def _step_fail(d):
+        console.print(f"[red]✗ {d}[/]")
+        sys.exit(1)
+
+    def _input(p, d=""):
+        return Prompt.ask(p, default=d) if d else Prompt.ask(p)
+
+    def _confirm(p, d=True):
+        return Confirm.ask(p, default=d)
 except ImportError:
     RICH = False
-    _banner = lambda t: print(f"\n{CYAN}{'═' * 60}{RESET}\n{CYAN}{BOLD}  {t}{RESET}\n{CYAN}{'═' * 60}{RESET}\n")
-    _section = lambda t: print(f"  {CYAN}→{RESET} {t}")
-    _step = lambda t: print(f"    {t} ... ", end="", flush=True)
-    _ok = lambda: print(f"{GREEN}✓ done{RESET}")
-    _fail = lambda: print(f"{RED}✗ failed{RESET}") or sys.exit(1)
-    _step_ok = lambda d: print(f"{GREEN}✓ {d}{RESET}")
-    _step_fail = lambda d: print(f"{RED}✗ {d}{RESET}") or sys.exit(1)
-    _input = lambda p, d="": input(f"  {p} [{d}]: ").strip() or d if d else input(f"  {p}: ").strip()
-    _confirm = lambda p, d=True: input(f"  {p} [{'Y' if d else 'y'}/{'n' if d else 'N'}]: ").strip().lower() in ("y", "yes") if d else input(f"  {p} [y/N]: ").strip().lower() in ("y", "yes")
+
+    def _banner(t):
+        print(f"\n{CYAN}{'═' * 60}{RESET}\n{CYAN}{BOLD}  {t}{RESET}\n"
+              f"{CYAN}{'═' * 60}{RESET}\n")
+
+    def _section(t):
+        print(f"  {CYAN}→{RESET} {t}")
+
+    def _step(t):
+        print(f"    {t} ... ", end="", flush=True)
+
+    def _ok():
+        print(f"{GREEN}✓ done{RESET}")
+
+    def _fail():
+        print(f"{RED}✗ failed{RESET}")
+        sys.exit(1)
+
+    def _step_ok(d):
+        print(f"{GREEN}✓ {d}{RESET}")
+
+    def _step_fail(d):
+        print(f"{RED}✗ {d}{RESET}")
+        sys.exit(1)
+
+    def _input(p, d=""):
+        if d:
+            prompt = f"  {p} [{d}]: "
+            return input(prompt).strip() or d
+        else:
+            prompt = f"  {p}: "
+            return input(prompt).strip()
+
+    def _confirm(p, d=True):
+        if d:
+            prompt = f"  {p} [Y/n]: "
+            ans = input(prompt).strip().lower()
+            return ans in ("y", "yes") if ans else True
+        else:
+            prompt = f"  {p} [y/N]: "
+            ans = input(prompt).strip().lower()
+            return ans in ("y", "yes")
 
 
-# ── Paths ─────────────────────────────────────────────────────────────────────
+# ── Paths ────────────────────────────────────────────────────────────────────
 
 ROOT = Path(__file__).resolve().parent
 TEMPLATE = ROOT / "sagemake-template"
@@ -75,8 +125,12 @@ def collect_project_info() -> dict:
     _banner("Project Information")
 
     info["project_name"] = _input("Project name", "my-sage-project")
-    if any(c in info["project_name"] for c in ("/", "\\", "..", ":", ".", "\0")):
-        _step_fail("project name cannot contain '/', '\\', '..', ':', '.', or null bytes")
+    if any(c in info["project_name"]
+           for c in ("/", "\\", "..", ":", ".", "\0")):
+        _step_fail(
+            "project name cannot contain '/', '\\', '..', ':', '.', "
+            "or null bytes"
+        )
 
     info["project_description"] = _input(
         "Short description",
@@ -87,8 +141,12 @@ def collect_project_info() -> dict:
         "Binary / output name",
         info["project_name"].replace("-", "_"),
     )
-    if any(c in info["binary_name"] for c in ("/", "\\", "..", ":", ".", "\0")):
-        _step_fail("binary name cannot contain '/', '\\', '..', ':', '.', or null bytes")
+    if any(c in info["binary_name"]
+           for c in ("/", "\\", "..", ":", ".", "\0")):
+        _step_fail(
+            "binary name cannot contain '/', '\\', '..', ':', '.', "
+            "or null bytes"
+        )
     info["dependencies"] = _input(
         "Required dependencies (comma-separated)",
         "gcc, make",
@@ -97,7 +155,8 @@ def collect_project_info() -> dict:
     # Confirm
     _banner("Summary")
 
-    deps_list = [d.strip() for d in info["dependencies"].split(",") if d.strip()]
+    deps_list = [d.strip() for d in info["dependencies"].split(",")
+                 if d.strip()]
 
     if RICH:
         table = Table(show_header=False, border_style="cyan")
@@ -121,17 +180,20 @@ def collect_project_info() -> dict:
     return info
 
 
-import json
-
 def escape_json(s: str) -> str:
-    """Escape string as a valid JSON string literal to prevent template injection."""
-    # json.dumps correctly escapes all control characters, backslashes, and quotes,
-    # and wraps the result in double quotes. This provides a safe, complete string literal.
+    """Escape string as a valid JSON string literal to prevent template
+    injection.
+    """
+    # json.dumps correctly escapes all control characters, backslashes,
+    # and quotes, and wraps the result in double quotes.
+    # This provides a safe, complete string literal.
     return json.dumps(s)
 
 
 def sanitize_docstring(s: str) -> str:
-    """Sanitize string for inclusion in a Python docstring (escapes triple quotes and backslashes)."""
+    """Sanitize string for inclusion in a Python docstring
+    (escapes triple quotes and backslashes).
+    """
     return s.replace('\\', '\\\\').replace('"""', '\\"\\"\\"')
 
 
@@ -152,7 +214,9 @@ def generate_sagemake(info: dict) -> Path:
         "{{ PROJECT_NAME_JSON }}": escape_json(info["project_name"]),
         "{{ BINARY_NAME_JSON }}": escape_json(info["binary_name"]),
         "{{ PROJECT_NAME_DOC }}": sanitize_docstring(info["project_name"]),
-        "{{ PROJECT_DESCRIPTION_DOC }}": sanitize_docstring(info["project_description"]),
+        "{{ PROJECT_DESCRIPTION_DOC }}": sanitize_docstring(
+            info["project_description"]
+        ),
         "{{ DEPENDENCIES }}": json.dumps(info["dependencies_list"]),
     }
     for placeholder, value in replacements.items():
@@ -181,28 +245,30 @@ def show_next_steps(output_file: Path) -> None:
     if RICH:
         console.print(
             Panel(
-                f"[green]✓[/] sagemake generated at:\n"
+                "[green]✓[/] sagemake generated at:\n"
                 f"  [bold]{output_file}[/]\n\n"
-                f"Next steps:\n"
+                "Next steps:\n"
                 f"  1. [bold]cd {output_file.parent}[/]\n"
-                f"  2. [bold]./sagemake build[/] — try the build pipeline\n"
-                f"  3. Edit the file to add your real build logic\n"
-                f"  4. Move [bold]sagemake[/] to your project root",
+                "  2. [bold]./sagemake build[/] — try the build pipeline\n"
+                "  3. Edit the file to add your real build logic\n"
+                "  4. Move [bold]sagemake[/] to your project root",
                 border_style="green",
             )
         )
     else:
-        print(f"\n  {GREEN}✓{RESET} sagemake generated at {BOLD}{output_file}{RESET}")
+        print(f"\n  {GREEN}✓{RESET} sagemake generated at "
+              f"{BOLD}{output_file}{RESET}")
         print(f"\n  {BOLD}Next steps:{RESET}")
         print(f"    1. cd {output_file.parent}")
-        print(f"    2. ./sagemake build  — try the build pipeline")
-        print(f"    3. Edit the file to add your real build logic")
-        print(f"    4. Move sagemake to your project root")
+        print("    2. ./sagemake build  — try the build pipeline")
+        print("    3. Edit the file to add your real build logic")
+        print("    4. Move sagemake to your project root")
 
 
 def main() -> None:
     print_logo()
-    print(f"  {DIM}This tool turns sagemake-template into a ready-to-use{RESET}")
+    print(f"  {DIM}This tool turns sagemake-template into a "
+          f"ready-to-use{RESET}")
     print(f"  {DIM}sagemake for your own Sage-based project.{RESET}\n")
 
     info = collect_project_info()

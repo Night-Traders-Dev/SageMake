@@ -139,7 +139,10 @@ def get_source_hash(directory: Path, args: list[str] = None) -> str:
     except ValueError:
         script_in_dir = None
 
-    rglob_files = [p for p in sorted(directory.rglob("*"), key=lambda p: p.as_posix()) if p != script_in_dir]
+    rglob_files = [
+        p for p in sorted(directory.rglob("*"), key=lambda p: p.as_posix())
+        if p != script_in_dir and "__pycache__" not in p.parts and p.suffix != ".pyc"
+    ]
     if script_path.exists():
         files_to_hash = [script_path] + rglob_files
     else:

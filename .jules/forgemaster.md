@@ -29,6 +29,7 @@ The system architecture is extremely robust. Previous iterations of the audit su
   - *Resolved*: Non-Deterministic Sorting (fixed by sorting `.as_posix()`).
   - *Resolved*: Umask Metadata Hash Variance (fixed by hashing only the executable bit of `st_mode`).
   - *Resolved*: Hidden State Changes (fixed by directly hashing the build script itself alongside command-line arguments and critical environment variables).
+  - *Resolved*: Non-Deterministic Pycache Generation (fixed by explicitly ignoring `__pycache__` and `*.pyc` files during source hashing).
 - **Cross-Platform Issues**:
   - *Resolved*: Cache Pollution across OS/Arch (fixed by including OS/Arch string in hash state).
   - *Resolved*: `subprocess.run` Dropping Environment Variables (fixed by merging `os.environ`).

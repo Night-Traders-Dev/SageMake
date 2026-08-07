@@ -18,6 +18,7 @@ The comprehensive audit of SageMake across architecture, security, performance, 
 8. **Medium**: Artifact Tampering Risks. (Fixed by dynamically hashing the generated artifact upon rebuild).
 9. **Medium**: Unhandled Exceptions on Install/Clean. (Fixed by robust `try...except` handling).
 10. **Low**: Unfriendly Dependency Checking. (Fixed by aggregating all missing tools before erroring).
+11. **Low**: Unnecessary Cache Invalidations from Pycache. (Fixed by filtering out `__pycache__` and `.pyc` files from source hashing).
 
 ---
 
@@ -72,6 +73,7 @@ SageMake is a single, self-contained Python 3 orchestrator replacing Makefiles a
 - External dependencies that cause hidden cache divergence (e.g., `CC`, `CFLAGS`, command-line flags) are properly added to the cache state.
 - File ownership/metadata changes (e.g., Umask determinism issues) are avoided by solely hashing the executable bit of `st_mode`.
 - The build orchestrator dynamically hashes its *own* source code, meaning modifications to the build logic itself automatically trigger clean rebuilds.
+- Non-deterministic Python bytecode compilation (`__pycache__`, `*.pyc`) is explicitly excluded from source hashing, preventing random cache invalidations.
 
 ---
 

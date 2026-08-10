@@ -16,8 +16,9 @@ The comprehensive audit of SageMake across architecture, security, performance, 
 6. **Medium**: Dropped Environment Variables. (Fixed by properly passing `os.environ` to subprocesses).
 7. **Medium**: Cache Race Conditions & Corruption. (Fixed via dynamic, atomic temporary files).
 8. **Medium**: Artifact Tampering Risks. (Fixed by dynamically hashing the generated artifact upon rebuild).
-9. **Medium**: Unhandled Exceptions on Install/Clean. (Fixed by robust `try...except` handling).
-10. **Low**: Unfriendly Dependency Checking. (Fixed by aggregating all missing tools before erroring).
+9. **Medium**: Silent Cache Corruption. (Fixed by failing the build when binary hashing throws an exception rather than silently ignoring).
+10. **Medium**: Unhandled Exceptions on Install/Clean. (Fixed by robust `try...except` handling).
+11. **Low**: Unfriendly Dependency Checking. (Fixed by aggregating all missing tools before erroring).
 
 ---
 
@@ -38,7 +39,7 @@ SageMake is a single, self-contained Python 3 orchestrator replacing Makefiles a
 - **Command Injection**: `subprocess.run(check=True)` enforces list-based arguments without `shell=True`, preventing shell injections.
 - **Template Injection**: User input is strictly sanitized and safely serialized into valid Python syntax using `json.dumps()`, preventing payload execution.
 - **Path Traversal**: Critical input pathways (e.g., project names, binary names) explicitly block path traversal (`..`, `/`, `\`) and edge case characters (`:`, `.`, `\0`), ensuring outputs are hermetically contained.
-- **Cache Poisoning**: The cache ensures that artifacts have not been modified outside the build system by dynamically verifying the binary hash against the combined source-artifact cache state.
+- **Cache Poisoning**: The cache ensures that artifacts have not been modified outside the build system by dynamically verifying the binary hash against the combined source-artifact cache state. Silent cache corruption has been prevented by explicitly failing the build if hashing fails for any unexpected reason.
 - **Supply Chain Risks**: Delegated entirely to explicit project configuration; SageMake operates securely in offline environments.
 
 ---

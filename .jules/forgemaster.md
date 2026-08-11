@@ -39,3 +39,6 @@ The system architecture is extremely robust. Previous iterations of the audit su
 - **Scalability**:
   - *Resolved*: File Reading Memory Exhaustion (fixed by processing hashing in 8192-byte chunks).
   - *Resolved*: O(N) Syscall Overhead during Globbing (fixed by pre-calculating relative path exclusions).
+- **Correctness and Determinism**:
+  - *Resolved*: Silent binary hash read failure in incremental build cache causing incorrect caching behavior (fixed by removing silent exception handling and using `step_fail()`).
+  - *Resolved*: E731 linter compliance violation (fixed by refactoring `sort_key` logic into an inline lambda without degrading determinism).

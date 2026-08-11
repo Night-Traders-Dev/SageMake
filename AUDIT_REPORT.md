@@ -17,7 +17,8 @@ The comprehensive audit of SageMake across architecture, security, performance, 
 7. **Medium**: Cache Race Conditions & Corruption. (Fixed via dynamic, atomic temporary files).
 8. **Medium**: Artifact Tampering Risks. (Fixed by dynamically hashing the generated artifact upon rebuild).
 9. **Medium**: Unhandled Exceptions on Install/Clean. (Fixed by robust `try...except` handling).
-10. **Low**: Unfriendly Dependency Checking. (Fixed by aggregating all missing tools before erroring).
+10. **Medium**: Unreadable File Cache Ignorance. (Silent pass replaced with fatal error during read fails for cache artifacts, except for `FileNotFoundError`).
+11. **Low**: Unfriendly Dependency Checking. (Fixed by aggregating all missing tools before erroring).
 
 ---
 

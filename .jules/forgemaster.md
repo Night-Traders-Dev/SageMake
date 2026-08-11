@@ -24,7 +24,7 @@ The system architecture is extremely robust. Previous iterations of the audit su
   - *Resolved*: Cache Hash Collision Risk (fixed via length-prefixing and null bytes).
   - *Resolved*: Partial/corrupted cache state on interrupt (fixed via atomic temp files & replace).
   - *Resolved*: Artifact Tampering & Incremental Build Inaccuracy (fixed by dynamically hashing the built artifact and requiring its existence).
-  - *Resolved*: Unreadable File Cache Ignorance (silent pass replaced with fatal error during read fails).
+  - *Resolved*: Unreadable File Cache Ignorance (silent pass replaced with fatal error during read fails, except for `FileNotFoundError` which safely resets cache state).
 - **Determinism Violations**:
   - *Resolved*: Non-Deterministic Sorting (fixed by sorting `.as_posix()`).
   - *Resolved*: Umask Metadata Hash Variance (fixed by hashing only the executable bit of `st_mode`).

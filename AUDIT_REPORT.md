@@ -19,7 +19,8 @@ The comprehensive audit of SageMake across architecture, security, performance, 
 9. **Medium**: Unhandled Exceptions on Install/Clean. (Fixed by robust `try...except` handling).
 10. **Low**: Unfriendly Dependency Checking. (Fixed by aggregating all missing tools before erroring).
 11. **Low**: Silent Hash Reading Failures. (Fixed by failing fast instead of ignoring cache read exceptions).
-12. **Informational**: Linter Violations on Lambdas. (Fixed by inline lambda usage instead of assigning it as `sort_key`).
+12. **Low**: FileNotFoundError During Binary Hashing. (Fixed by gracefully catching missing files as empty hashes to prevent race condition crashes).
+13. **Informational**: Linter Violations on Lambdas. (Fixed by inline lambda usage instead of assigning it as `sort_key`).
 
 ---
 

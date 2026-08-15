@@ -41,4 +41,5 @@ The system architecture is extremely robust. Previous iterations of the audit su
   - *Resolved*: O(N) Syscall Overhead during Globbing (fixed by pre-calculating relative path exclusions).
 - **Correctness and Determinism**:
   - *Resolved*: Silent binary hash read failure in incremental build cache causing incorrect caching behavior (fixed by removing silent exception handling and using `step_fail()`).
+  - *Resolved*: FileNotFoundError crash due to race conditions during binary artifact hashing (fixed by catching `FileNotFoundError` and setting hash to empty string).
   - *Resolved*: E731 linter compliance violation (fixed by refactoring `sort_key` logic into an inline lambda without degrading determinism).

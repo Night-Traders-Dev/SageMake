@@ -25,6 +25,7 @@ The system architecture is extremely robust. Previous iterations of the audit su
   - *Resolved*: Partial/corrupted cache state on interrupt (fixed via atomic temp files & replace).
   - *Resolved*: Artifact Tampering & Incremental Build Inaccuracy (fixed by dynamically hashing the built artifact and requiring its existence).
   - *Resolved*: Unreadable File Cache Ignorance (silent pass replaced with fatal error during read fails).
+  - *Resolved*: Initial Build Failure / TOCTOU Race Condition on Missing Files (fixed by gracefully catching `FileNotFoundError` to allow empty string hashes on clean builds, while still failing fast on other read exceptions).
 - **Determinism Violations**:
   - *Resolved*: Non-Deterministic Sorting (fixed by sorting `.as_posix()`).
   - *Resolved*: Umask Metadata Hash Variance (fixed by hashing only the executable bit of `st_mode`).

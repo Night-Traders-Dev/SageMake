@@ -196,6 +196,8 @@ def cmd_build(args: list[str]) -> None:
                 while chunk := f.read(8192):
                     b_hasher.update(chunk)
             binary_hash = b_hasher.hexdigest()
+        except FileNotFoundError:
+            binary_hash = ""
         except Exception as e:
             step_fail(f"failed to read {binary_file} for hashing: {e}")
 
@@ -222,6 +224,8 @@ def cmd_build(args: list[str]) -> None:
                 while chunk := f.read(8192):
                     b_hasher.update(chunk)
             new_binary_hash = b_hasher.hexdigest()
+        except FileNotFoundError:
+            new_binary_hash = ""
         except Exception as e:
             step_fail(f"failed to read {binary_file} for hashing: {e}")
 

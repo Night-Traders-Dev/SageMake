@@ -1,45 +1,24 @@
 # ForgeMaster Journal
 
-## Audit Context
-SageMake is a single, self-contained Python 3 orchestrator that replaces traditional shell scripts and Makefiles.
-- **Dependency graph engine**: None. Delegated to `make`/`cmake`.
-- **Parser & Executor**: Python 3 standard library `subprocess.run()`.
-- **Scheduler**: None. Delegated to `make -j` or underlying build tool.
-- **Cache system**: Native incremental caching via SHA256 of directory state.
-- **Artifact manager**: Handled via standard Python `shutil` library.
-- **Plugin system**: Implicit. The generated `sagemake` scripts wrap any external CLI tool.
-- **Mechanism**: The `sagemake` script generates a `sagemake` file from `sagemake-template`. The generated script uses Python's `subprocess.run()` to sequentially execute shell commands.
+## Major Discoveries
 
-## Final Review Statement
-**The comprehensive audit of SageMake has been completed successfully.**
+### Build graph edge cases
+- `sagemake-template` generated projects use a single `build` command rather than full dependency graph parsing. However, when integrated with complex dependencies, `check_dependencies` runs linearly.
+- SageOS and SageVM incorporate other repositories as Git submodules or dependencies and coordinate across them via subprocess.
 
-The system architecture is extremely robust. Previous iterations of the audit successfully caught, mitigated, and fixed all major risks spanning security, determinism, performance, correctness, and cross-platform behavior. The generated Python-based build orchestrator is fast, secure, strictly deterministic, and fully production-ready.
+### Scheduler limitations
+- No built-in parallelism in the Python wrapper logic in the template (relies on underlying `make -j` or similar).
 
-## Major Discoveries (All Resolved)
-- **Build Graph Edge Cases**:
-  - SageMake correctly acts as an orchestrator wrapper and defers graph parsing to underlying tools. Overhead is O(1).
-- **Scheduler Limitations**:
-  - Task execution is sequential; parallelism correctly defers to standard build tools (e.g. `make -j`).
-- **Cache Bugs**:
-  - *Resolved*: Cache Hash Collision Risk (fixed via length-prefixing and null bytes).
-  - *Resolved*: Partial/corrupted cache state on interrupt (fixed via atomic temp files & replace).
-  - *Resolved*: Artifact Tampering & Incremental Build Inaccuracy (fixed by dynamically hashing the built artifact and requiring its existence).
-  - *Resolved*: Unreadable File Cache Ignorance (silent pass replaced with fatal error during read fails).
-  - *Resolved*: Initial Build Failure / TOCTOU Race Condition on Missing Files (fixed by gracefully catching `FileNotFoundError` to allow empty string hashes on clean builds, while still failing fast on other read exceptions).
-- **Determinism Violations**:
-  - *Resolved*: Non-Deterministic Sorting (fixed by sorting `.as_posix()`).
-  - *Resolved*: Umask Metadata Hash Variance (fixed by hashing only the executable bit of `st_mode`).
-  - *Resolved*: Hidden State Changes (fixed by directly hashing the build script itself alongside command-line arguments and critical environment variables).
-- **Cross-Platform Issues**:
-  - *Resolved*: Cache Pollution across OS/Arch (fixed by including OS/Arch string in hash state).
-  - *Resolved*: `subprocess.run` Dropping Environment Variables (fixed by merging `os.environ`).
-  - *Resolved*: Encoding Crashes on Windows (fixed by enforcing `utf-8` on all file reads).
-- **Security**:
-  - *Resolved*: Template Injection & Corrupted Scripts (fixed by using `json.dumps()` securely).
-  - *Resolved*: Path Traversal (strict validations added to block `/`, `\`, `..`, `:`, `.`, `\0`).
-- **Scalability**:
-  - *Resolved*: File Reading Memory Exhaustion (fixed by processing hashing in 8192-byte chunks).
-  - *Resolved*: O(N) Syscall Overhead during Globbing (fixed by pre-calculating relative path exclusions).
-- **Correctness and Determinism**:
-  - *Resolved*: Silent binary hash read failure in incremental build cache causing incorrect caching behavior (fixed by removing silent exception handling and using `step_fail()`).
-  - *Resolved*: E731 linter compliance violation (fixed by refactoring `sort_key` logic into an inline lambda without degrading determinism).
+### Cache bugs
+- The template uses SHA-256 for caching in `get_source_hash`, which includes the script itself, OS/arch info, env vars, file paths, executable bits, file sizes, and file contents. It uses atomic writes to prevent race conditions during updates.
+- If a user runs `build` without any arguments, `args` defaults to `[]`. The `cmd_build` call passes `args` to `get_source_hash`.
+
+### Incremental build failures
+- Incremental build determinism correctly considers the binary hash (`binary_hash`) and the source hash to verify build outputs against tampered binaries.
+
+### Determinism violations
+- The executable bit is hashed using `st_mode & 0o111`, avoiding full `st_mode` which could include umask variability.
+
+### Cross-platform issues
+- Uses `shutil` and `os.name` checking extensively to avoid platform-specific shell utilities. Windows installs default to `APPDATA`.
+

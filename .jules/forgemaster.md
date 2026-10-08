@@ -1,45 +1,19 @@
 # ForgeMaster Journal
 
-## Audit Context
-SageMake is a single, self-contained Python 3 orchestrator that replaces traditional shell scripts and Makefiles.
-- **Dependency graph engine**: None. Delegated to `make`/`cmake`.
-- **Parser & Executor**: Python 3 standard library `subprocess.run()`.
-- **Scheduler**: None. Delegated to `make -j` or underlying build tool.
-- **Cache system**: Native incremental caching via SHA256 of directory state.
-- **Artifact manager**: Handled via standard Python `shutil` library.
-- **Plugin system**: Implicit. The generated `sagemake` scripts wrap any external CLI tool.
-- **Mechanism**: The `sagemake` script generates a `sagemake` file from `sagemake-template`. The generated script uses Python's `subprocess.run()` to sequentially execute shell commands.
+## Build graph edge cases
+SageMake relies strictly on underlying tools like `make` to handle actual graph construction. Python script acts as a linear orchestrator. Overhead is effectively O(1) for parsing since it avoids parsing large dependency graphs natively.
 
-## Final Review Statement
-**The comprehensive audit of SageMake has been completed successfully.**
+## Scheduler limitations
+Tasks are executed sequentially via standard `subprocess.run()`. All true scheduling and multiprocessing is deferred to the underlying build tools (e.g. `make -j`).
 
-The system architecture is extremely robust. Previous iterations of the audit successfully caught, mitigated, and fixed all major risks spanning security, determinism, performance, correctness, and cross-platform behavior. The generated Python-based build orchestrator is fast, secure, strictly deterministic, and fully production-ready.
+## Cache bugs
+No active bugs found during this audit cycle. Incremental builds use `.build_hash` verified via dynamic binary output checks and atomic tmp-file replacement to prevent corruption. Hash collisions are averted by strict null-byte length prefixing. Race conditions/initial miss failures handled via graceful catch of `FileNotFoundError`.
 
-## Major Discoveries (All Resolved)
-- **Build Graph Edge Cases**:
-  - SageMake correctly acts as an orchestrator wrapper and defers graph parsing to underlying tools. Overhead is O(1).
-- **Scheduler Limitations**:
-  - Task execution is sequential; parallelism correctly defers to standard build tools (e.g. `make -j`).
-- **Cache Bugs**:
-  - *Resolved*: Cache Hash Collision Risk (fixed via length-prefixing and null bytes).
-  - *Resolved*: Partial/corrupted cache state on interrupt (fixed via atomic temp files & replace).
-  - *Resolved*: Artifact Tampering & Incremental Build Inaccuracy (fixed by dynamically hashing the built artifact and requiring its existence).
-  - *Resolved*: Unreadable File Cache Ignorance (silent pass replaced with fatal error during read fails).
-  - *Resolved*: Initial Build Failure / TOCTOU Race Condition on Missing Files (fixed by gracefully catching `FileNotFoundError` to allow empty string hashes on clean builds, while still failing fast on other read exceptions).
-- **Determinism Violations**:
-  - *Resolved*: Non-Deterministic Sorting (fixed by sorting `.as_posix()`).
-  - *Resolved*: Umask Metadata Hash Variance (fixed by hashing only the executable bit of `st_mode`).
-  - *Resolved*: Hidden State Changes (fixed by directly hashing the build script itself alongside command-line arguments and critical environment variables).
-- **Cross-Platform Issues**:
-  - *Resolved*: Cache Pollution across OS/Arch (fixed by including OS/Arch string in hash state).
-  - *Resolved*: `subprocess.run` Dropping Environment Variables (fixed by merging `os.environ`).
-  - *Resolved*: Encoding Crashes on Windows (fixed by enforcing `utf-8` on all file reads).
-- **Security**:
-  - *Resolved*: Template Injection & Corrupted Scripts (fixed by using `json.dumps()` securely).
-  - *Resolved*: Path Traversal (strict validations added to block `/`, `\`, `..`, `:`, `.`, `\0`).
-- **Scalability**:
-  - *Resolved*: File Reading Memory Exhaustion (fixed by processing hashing in 8192-byte chunks).
-  - *Resolved*: O(N) Syscall Overhead during Globbing (fixed by pre-calculating relative path exclusions).
-- **Correctness and Determinism**:
-  - *Resolved*: Silent binary hash read failure in incremental build cache causing incorrect caching behavior (fixed by removing silent exception handling and using `step_fail()`).
-  - *Resolved*: E731 linter compliance violation (fixed by refactoring `sort_key` logic into an inline lambda without degrading determinism).
+## Incremental build failures
+Incremental builds behave perfectly, appropriately hashing file contents in 8192-byte chunks and tracking the executable bit on path stats. Modifying or deleting target binary artifacts correctly flags cache misses.
+
+## Determinism violations
+No hidden state violations remain. The script explicitly hashes its own `Path(__file__)` code, cross-platform host OS/Architecture attributes, and hidden environment variables like `CC`, `CFLAGS`, and `LDFLAGS`. Path iterations are securely and uniformly sorted using `.as_posix()`.
+
+## Cross-platform issues
+Code correctly abstracts paths utilizing the `pathlib` module. All read/write text routines explicitly declare `encoding="utf-8"`, preventing Windows OS locale crashes. Subprocess calls map cleanly to `os.environ.copy()`. Unix abstractions like `rm -rf` are successfully avoided through `shutil.rmtree()`.
